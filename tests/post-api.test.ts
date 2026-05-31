@@ -215,6 +215,22 @@ test('scheduled manual posted action ends exported and sets server timestamps', 
   assert.equal(values.manualPostedAt, now);
 });
 
+test('undo manual posted restores scheduled posts and clears completion timestamps', () => {
+  const scheduledAt = new Date('2026-05-31T16:00:00.000Z');
+  const input = postUpdateSchema.parse({ manual_posted: false });
+  const values = buildUpdatePostValues(
+    'exported',
+    input,
+    new Date('2026-05-28T00:00:00.000Z'),
+    { scheduledAt },
+  );
+
+  assert.equal(values.status, 'scheduled');
+  assert.equal(values.exportedAt, null);
+  assert.equal(values.manualPostedAt, null);
+  assert.equal(values.scheduledAt, undefined);
+});
+
 test('exported manual posted action sets manual_posted_at without changing status', () => {
   const now = new Date('2026-05-28T00:00:00.000Z');
   const input = postUpdateSchema.parse({ manual_posted: true });
@@ -233,10 +249,16 @@ test('draft review and approved posts cannot be marked manually posted', () => {
   assert.throws(() => buildUpdatePostValues('approved', input), /Export or schedule/);
 });
 
-test('undo manual posted clears timestamp and leaves exported status unchanged', () => {
+test('undo manual posted on unscheduled exported post leaves exported status unchanged', () => {
   const input = postUpdateSchema.parse({ manual_posted: false });
-  const values = buildUpdatePostValues('exported', input, new Date('2026-05-28T00:00:00.000Z'));
+  const values = buildUpdatePostValues(
+    'exported',
+    input,
+    new Date('2026-05-28T00:00:00.000Z'),
+    { scheduledAt: null },
+  );
 
   assert.equal(values.status, undefined);
+  assert.equal(values.exportedAt, undefined);
   assert.equal(values.manualPostedAt, null);
 });

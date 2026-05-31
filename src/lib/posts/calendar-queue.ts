@@ -143,6 +143,10 @@ export function isQueuePostManuallyPosted(post: { manualPostedAt: string | null 
   return Boolean(post.manualPostedAt);
 }
 
+export function getQueuePostCompletionState(post: { manualPostedAt: string | null }) {
+  return isQueuePostManuallyPosted(post) ? 'complete' : 'open';
+}
+
 function compareQueuePosts(left: CalendarQueuePost, right: CalendarQueuePost) {
   const leftDate = readQueueSortDate(left);
   const rightDate = readQueueSortDate(right);

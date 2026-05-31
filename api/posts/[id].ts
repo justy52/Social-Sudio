@@ -60,7 +60,7 @@ async function updatePost(req: VercelRequest, res: VercelResponse) {
   const postId = getPostId(req);
   const { post } = await requirePostOwnership(req, postId);
   const input = postUpdateSchema.parse(parseJsonBody(req));
-  const values = buildUpdatePostValues(post.status, input);
+  const values = buildUpdatePostValues(post.status, input, new Date(), post);
 
   const [updatedPost] = await db.update(posts).set(values).where(eq(posts.id, postId)).returning();
 

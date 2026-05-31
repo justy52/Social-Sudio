@@ -16,6 +16,7 @@ import {
   buildUndoPostedPayload,
   canQueuePostExport,
   filterCalendarQueuePosts,
+  getQueuePostCompletionState,
   getQueueThumbnailUrl,
   getTodayQueueSections,
   groupCalendarQueuePosts,
@@ -472,15 +473,16 @@ function QueuePostCard({
   const thumbnailUrl = getQueueThumbnailUrl(post);
   const hashtags = formatHashtagsForPost(post.hashtags);
   const canExport = canQueuePostExport(post);
-  const isPosted = isQueuePostManuallyPosted(post);
+  const completionState = getQueuePostCompletionState(post);
+  const isPosted = completionState === 'complete';
 
   return (
-    <Card className={cn(isPosted && 'border-border bg-muted/40')}>
+    <Card className={cn(isPosted && 'border-primary/20 border-l-4 border-l-primary/60 bg-muted/50 shadow-none')}>
       <CardContent className="grid gap-4 p-4 sm:grid-cols-[96px_minmax(0,1fr)]">
         <div
           className={cn(
             'flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border bg-muted',
-            isPosted && 'opacity-80',
+            isPosted && 'opacity-75 grayscale',
           )}
         >
           {thumbnailUrl ? (

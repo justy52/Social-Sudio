@@ -64,6 +64,7 @@ export function buildUpdatePostValues(
   currentStatusValue: string,
   input: PostUpdateInput,
   now = new Date(),
+  currentPost: { scheduledAt?: Date | string | null } = {},
 ) {
   const values: {
     caption?: string;
@@ -73,7 +74,7 @@ export function buildUpdatePostValues(
     aiGenerated?: boolean;
     status?: PostStatus;
     scheduledAt?: Date | null;
-    exportedAt?: Date;
+    exportedAt?: Date | null;
     manualPostedAt?: Date | null;
     updatedAt: Date;
   } = {
@@ -112,6 +113,10 @@ export function buildUpdatePostValues(
     }
 
     values.manualPostedAt = null;
+    if (currentPost.scheduledAt) {
+      values.status = 'scheduled';
+      values.exportedAt = null;
+    }
     return values;
   }
 

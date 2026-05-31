@@ -25,6 +25,7 @@ import {
   buildUndoPostedPayload,
   canQueuePostExport,
   filterCalendarQueuePosts,
+  getQueuePostCompletionState,
   getTodayQueueEmptyState,
   getTodayQueueSections,
   getQueueThumbnailUrl,
@@ -869,6 +870,40 @@ test('today queue separates posted and unposted items with counts', () => {
   assert.equal(sections.emptyState, 'none');
 });
 
+test('today queue moves restored scheduled item back to to-post section after undo', () => {
+  const now = new Date('2026-05-31T18:00:00.000Z');
+  const restoredToday = buildQueuePost({
+    id: 'restored_today',
+    status: 'scheduled',
+    scheduledAt: '2026-05-31T16:00:00.000Z',
+    exportedAt: null,
+    manualPostedAt: null,
+  });
+  const sections = getTodayQueueSections([restoredToday], now);
+
+  assert.deepEqual(
+    sections.remaining.map((post) => post.id),
+    ['restored_today'],
+  );
+  assert.deepEqual(sections.posted, []);
+});
+
+test('upcoming queue shows restored scheduled item after undo', () => {
+  const now = new Date('2026-05-31T18:00:00.000Z');
+  const restoredFuture = buildQueuePost({
+    id: 'restored_future',
+    status: 'scheduled',
+    scheduledAt: '2026-06-02T16:00:00.000Z',
+    exportedAt: null,
+    manualPostedAt: null,
+  });
+
+  assert.deepEqual(
+    filterCalendarQueuePosts([restoredFuture], 'upcoming', now).map((post) => post.id),
+    ['restored_future'],
+  );
+});
+
 test('today queue empty states distinguish no posts from all posted', () => {
   const now = new Date('2026-05-31T18:00:00.000Z');
   const postedToday = buildQueuePost({
@@ -961,6 +996,17 @@ test('calendar queue recognizes manually posted completion state', () => {
 
   assert.equal(isQueuePostManuallyPosted(posted), true);
   assert.equal(isQueuePostManuallyPosted({ ...posted, manualPostedAt: null }), false);
+});
+
+test('calendar queue exposes completed styling classification for posted cards', () => {
+  const posted = buildQueuePost({
+    status: 'exported',
+    exportedAt: '2026-05-31T17:00:00.000Z',
+    manualPostedAt: '2026-05-31T17:15:00.000Z',
+  });
+
+  assert.equal(getQueuePostCompletionState(posted), 'complete');
+  assert.equal(getQueuePostCompletionState({ ...posted, manualPostedAt: null }), 'open');
 });
 
 function buildQueuePost(overrides: Partial<PostSummary> = {}): PostSummary {
