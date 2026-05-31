@@ -48,7 +48,7 @@ Update business details. Ownership check required.
 
 ## Phase 2 Routes
 
-Current implementation status: the posts API skeleton exists for create, list, view, update, and delete. The media upload/delete API exists for image-only Vercel Blob files linked to owned posts. A minimal `/posts` UI now uses these APIs. This does not include caption generation, editor/export routes, scheduling, or publishing.
+Current implementation status: Phase 2 content APIs are implemented and validated in Vercel Preview. Posts CRUD, media upload/delete, edited media upload, OpenAI caption generation, and manual export status updates are working. Scheduling and publishing are not built yet.
 
 ### `GET /api/posts?business_id=UUID`
 List posts owned by the authenticated user. Optional `business_id` filter must pass ownership verification.
@@ -66,13 +66,16 @@ Update a post. Can update caption, hashtags, platform size, notes, AI-generated 
 Delete a post and cascade linked `post_media` database rows. Ownership check required. Blob object cleanup is deferred to the media upload pass.
 
 ### `POST /api/media/upload`
-Upload image to Vercel Blob. Body: multipart FormData with `file` (max 10MB, JPEG/PNG/WebP only) and `post_id`. Ownership is verified through the post's business. Returns the created `post_media` record. `BLOB_READ_WRITE_TOKEN` is required for real uploads.
+Upload image to Vercel Blob. Body: multipart FormData with `file` (max 4MB, JPEG/PNG/WebP only) and `post_id`. Ownership is verified through the post's business. Returns the created `post_media` record. Vercel Preview uses connected Blob/OIDC runtime credentials; `BLOB_READ_WRITE_TOKEN` remains supported as a fallback.
+
+### `POST /api/media/edited`
+Upload the edited PNG rendered by the basic image editor. Body: multipart FormData with `file`, `post_id`, `width`, `height`, and optional `original_url`. Ownership is verified through the post's business. Creates a `post_media` row with `isEdited: true`.
 
 ### `DELETE /api/media/[key]`
 Delete image from Vercel Blob and the `post_media` record after verifying ownership through `post_media -> posts -> businesses`.
 
 ### `POST /api/captions/generate`
-Generate AI caption via Claude API. Server-side only.
+Generate AI caption via OpenAI. Server-side only.
 
 ```
 Body:
@@ -92,7 +95,7 @@ Response:
 }
 ```
 
-**Claude prompt structure** (in `src/lib/ai/captions.ts`):
+**OpenAI prompt structure** (in `src/lib/ai/captions.ts`):
 ```
 System: You are a social media copywriter for {business.name}, a {business.industry} business.
 Brand voice: {business.brandVoice || 'professional and approachable'}.
@@ -105,7 +108,7 @@ User: Write a caption about: {prompt_context}
 {image_description ? 'The image shows: ' + image_description : ''}
 ```
 
-Model: `claude-sonnet-4-20250514` — fast, cost-effective for short-form copy. Max tokens: 1000.
+Model: cost-effective OpenAI text model for short social captions. Max output is kept small and normalized to the existing response shape.
 
 ### `GET /api/dashboard/stats?business_id=UUID`
 Returns aggregated metrics for the dashboard.

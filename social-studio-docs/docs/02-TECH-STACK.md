@@ -47,7 +47,7 @@ Every technology choice is made for one or more of these reasons:
 
 | API | Purpose | Phase |
 |-----|---------|-------|
-| **Anthropic Claude API** | AI caption generation | Phase 2 |
+| **OpenAI API** | AI caption generation | Phase 2 |
 | **Meta Graph API** | Instagram + Facebook publishing | Phase 4 (not MVP) |
 
 ## Auth: Clerk (Decision Made)
@@ -84,9 +84,12 @@ CLERK_SECRET_KEY=sk_test_...
 CLERK_WEBHOOK_SECRET=whsec_...
 
 # AI (Phase 2)
-ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
 
 # Storage
+BLOB_STORE_ID=store_...
+BLOB_WEBHOOK_PUBLIC_KEY=...
+# Optional local fallback when Vercel Blob OIDC is unavailable:
 BLOB_READ_WRITE_TOKEN=vercel_blob_...
 
 # Email (optional Phase 3.5+)
@@ -109,6 +112,6 @@ CRON_SECRET=random-secret-string
 | Cloudflare | Unlimited DNS, basic CDN | $0 |
 | Clerk | 10,000 MAU | $0 |
 | Resend | 3,000 emails/mo | $0 if optional Phase 3.5+ reminders are enabled |
-| Anthropic API | Pay per token | ~$5–15/mo |
+| OpenAI API | Pay per token | ~$5–15/mo |
 | Vercel Blob | 250MB free | $0 |
 | **Total** | | **~$5–15/mo** |

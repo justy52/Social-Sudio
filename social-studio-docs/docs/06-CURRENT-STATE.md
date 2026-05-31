@@ -2,17 +2,17 @@
 
 ## Phase 1 Status
 
-Phase 1 foundation is complete enough to proceed to controlled Phase 2 implementation.
+Phase 1 foundation is complete and supports the Phase 2 content workflow.
 
 ### Confirmed Working
 
 - Documentation is stored in `social-studio-docs/`.
-- Vite + React + TypeScript app runs locally at `http://127.0.0.1:5173`.
+- Vite + React + TypeScript app runs locally.
 - Tailwind CSS and shadcn-style UI primitives are configured.
 - React Router routes exist for `/dashboard`, `/posts`, `/calendar`, and `/settings`.
 - Clerk login works.
 - Protected app routes redirect unauthenticated users.
-- Business setup works; a test business can be created locally.
+- Business setup works.
 - Neon migration works.
 - Phase 1 app tables exist: `users`, `businesses`.
 - Root `/api/` Phase 1 routes exist for businesses and Clerk webhook handling.
@@ -23,69 +23,77 @@ Phase 1 foundation is complete enough to proceed to controlled Phase 2 implement
 
 ### Local Development Note
 
-Plain Vite does not serve root `/api/*` serverless functions. A dev-only Vite API adapter is used locally so Phase 1 browser smoke tests can call `/api/businesses` and `/api/webhooks/clerk`.
+Plain Vite does not serve root `/api/*` serverless functions by itself. Use the project's Vite API adapter for local API smoke tests, or run through Vercel dev when validating Vercel runtime behavior.
 
-This does not replace production API routing. Vercel production still uses the root `/api/` serverless functions.
-
-### Placeholder Routes
-
-- `/posts` is a shell route only.
-- `/calendar` is a shell route only.
-
-No Phase 2 content workflow has been built yet.
+Vercel Blob OIDC upload behavior should be smoke-tested in Vercel Preview. Local Vercel dev may not provide the same OIDC runtime credentials.
 
 ## Phase 2 Status
 
-Phase 2 database foundation has started for the lean image-only content MVP.
+Phase 2 content MVP is implemented and browser-tested in Vercel Preview. The workflow is ready enough to move into Phase 3.
 
-Added in the first Phase 2 implementation step:
+### Implemented
 
 - `posts` table for draft, review, approved, and exported content records.
 - `post_media` table for image records attached to posts.
-- Focused status transition helpers for `draft`, `ready_for_review`, `approved`, and `exported`.
-- Ownership helper logic for future post/media APIs.
+- Root `/api/posts` routes for create, list, view, update, and delete.
+- Root `/api/media/upload`, `/api/media/edited`, and `/api/media/[key]` routes for image media.
+- Server-side ownership checks through businesses/posts/media.
+- Strict request validation for posts, captions, media upload, and status updates.
+- Server-side status transition enforcement for `draft`, `ready_for_review`, `approved`, and `exported`.
+- Server-owned `exported_at` handling.
+- Vercel Blob media storage with public image URLs for previews.
+- OpenAI-backed server-side caption generation.
+- Basic image editor using the HTML5 Canvas API directly.
+- Manual export flow with download, clipboard copy, exported state, and re-export.
+- Quick Export flow for solo workflows, while preserving the formal review workflow.
 
-Added in the second Phase 2 implementation step:
+### Preview Validation
 
-- Root `/api/posts` skeleton route for listing and creating draft posts.
-- Root `/api/posts/[id]` skeleton route for viewing, updating, and deleting owned posts.
-- Strict request validation for post draft fields and Phase 2-only status values.
-- Server-side status transition enforcement and server-owned `exported_at` handling.
+The Phase 2 workflow has been validated in Vercel Preview:
 
-Added in the third Phase 2 implementation step:
+- Workspace loads.
+- Draft creation and selection work.
+- Image upload works.
+- Uploaded image persists after refresh.
+- Image editor save works.
+- AI caption generation works.
+- Caption and hashtags save and persist.
+- Quick Export works directly from draft posts.
+- Formal review workflow still works: `draft` -> `ready_for_review` -> `approved` -> `exported`.
+- Exported state persists after refresh.
 
-- Root `/api/media/upload` route for image-only uploads linked to owned post drafts.
-- Root `/api/media/[key]` route for deleting owned media records and Blob objects.
-- Vercel Blob integration using `BLOB_READ_WRITE_TOKEN`.
-- JPEG, PNG, and WebP validation with a 10MB MVP file limit.
-- `post_media` records are created only after storage upload succeeds.
+### Current User Workflow
 
-Added in the fourth Phase 2 implementation step:
+Solo quick path:
 
-- Minimal `/posts` UI for the selected business.
-- Draft list with status, caption preview, platform size, dates, and first image preview.
-- Create Draft action wired to `POST /api/posts`.
-- Detail/edit panel for caption, hashtags, platform size, notes, and valid Phase 2 status transitions.
-- Image file input wired to `POST /api/media/upload`.
-- Image previews and single-image delete action wired to `DELETE /api/media/[key]`.
-- Draft post delete action wired to `DELETE /api/posts/[id]`.
+1. Create/select a draft.
+2. Upload an image.
+3. Optionally save an edited image.
+4. Generate or write caption and hashtags.
+5. Click `Export Now`.
+6. The app downloads the selected image, copies post text, moves the post through valid status transitions, and marks it exported.
 
-No AI caption route, image editor, export flow, calendar scheduling, publishing, or analytics feature has been built yet.
+Formal review path:
+
+1. Draft content.
+2. Move to `ready_for_review`.
+3. Approve.
+4. Export.
 
 ## Not Yet Built
 
-- No post drafts or post CRUD.
-- No AI caption generation.
-- No content editor or canvas export.
-- No calendar scheduling.
-- No email reminders.
-- No Meta publishing.
-- No cron.
-- No Stripe or billing.
-- No teams, roles, or client approval accounts.
-- No market intelligence or ad features.
-- No video, reels, or audio tools.
+- Calendar scheduling.
+- Scheduled/manual posting calendar view.
+- Email reminders.
+- Meta publishing.
+- Cron-based auto-publishing.
+- Stripe or billing.
+- Teams, roles, or client approval accounts.
+- Market intelligence or ad features.
+- Video, reels, audio, or stories.
+- Template library.
+- Analytics.
 
 ## Next Controlled Pass
 
-The next pass should be either caption API planning/implementation or a tiny export/manual-post planning pass. Do not do both in the same pass.
+Proceed to Phase 3 calendar/scheduling work. Keep direct publishing, Meta integration, analytics, billing, teams, ads, video, and templates out of scope.

@@ -8,6 +8,8 @@
 
 **Scope boundary:** This phase is **image-only, export-only**. Do NOT build video support, Meta API publishing, cron jobs, templates library, or analytics.
 
+**Current status:** Phase 2 is implemented and browser-tested in Vercel Preview. Workspace loading, draft creation/selection, image upload, image editor save, AI caption generation, caption/hashtag persistence, Quick Export from draft, formal review/export, and exported-state refresh persistence are validated. Phase 2 is ready enough to move to Phase 3.
+
 ---
 
 ## Tasks
@@ -69,9 +71,9 @@ useDeletePost()
 
 ### 2.2 — Image Upload & Storage
 
-Current implementation note: media upload/delete API is now present and uses `post_id` ownership verification. Width and height remain nullable until a lightweight dimension reader is added. No media upload UI, editor, caption generation, export flow, scheduling, or publishing has been built yet.
+Current implementation note: media upload/delete API is present and uses `post_id` ownership verification. Media upload works in Vercel Preview with public Vercel Blob storage. Width and height may remain nullable for original uploads; edited image uploads include render dimensions.
 
-Current UI note: minimal `/posts` UI now supports selected-business draft list/create/edit plus image upload preview and delete. AI captions, image editor, export flow, calendar scheduling, and publishing are still not built.
+Current UI note: `/posts` now supports selected-business draft list/create/edit, image upload preview/delete, AI captions, basic image editor save, formal review workflow, Quick Export, exported-post state, and re-export. Calendar scheduling and publishing are still not built.
 
 **Create API routes:**
 - `POST /api/media/upload` — accept multipart FormData, validate image files only (JPG/PNG/WebP, max 10MB), upload to Vercel Blob, return URL + key + dimensions
@@ -144,7 +146,7 @@ Use a `<canvas>` element with a React wrapper. Draw layers in order: background 
 
 ### 2.4 — AI Caption Generator
 
-**Create API route:** `POST /api/captions/generate` — calls Claude API server-side. Fetches business brand context from DB. Returns primary caption + 2 alternatives.
+**Create API route:** `POST /api/captions/generate` — calls OpenAI server-side. Fetches business brand context from DB. Returns primary caption + 2 alternatives.
 
 See `04-API-DESIGN.md` for full prompt structure.
 
@@ -172,11 +174,13 @@ See `04-API-DESIGN.md` for full prompt structure.
 
 This is the **core MVP output**. Users export finished content for manual posting.
 
-**"Export" button on approved posts:**
+**"Export" button on approved posts and "Export Now" on drafts/review posts:**
 1. Downloads the final edited image as a PNG file
 2. Copies the caption + hashtags to clipboard
 3. Updates post status to `exported`
-4. Shows a toast: "Image downloaded! Caption copied to clipboard. Ready to post!"
+4. Shows a success message
+
+Quick Export preserves server-controlled transitions by moving draft/review posts through valid intermediate statuses before ending at `exported`.
 
 **Post detail view** for exported posts:
 - Preview of the final image
@@ -191,6 +195,7 @@ This is the **core MVP output**. Users export finished content for manual postin
 - [ ] Post status updates to `exported`
 - [ ] Can re-export an already-exported post
 - [ ] Export works on mobile (download triggers properly)
+- [ ] Quick Export works directly from draft posts for solo workflows
 
 ---
 
@@ -236,12 +241,30 @@ Wire everything together on `/posts/new`:
 
 ## Phase 2 Completion Checklist
 
-- [ ] Posts CRUD with approval workflow statuses
-- [ ] Image upload to Vercel Blob
-- [ ] Basic image editor (size presets, text overlay, logo, export)
-- [ ] AI caption generation via Claude API
-- [ ] Export flow (download image + copy caption)
-- [ ] New Post page combining all features
-- [ ] Posts list with status filtering
-- [ ] All features work in production
-- [ ] **Social Studio is now usable for real content creation**
+- [x] Posts CRUD with approval workflow statuses
+- [x] Image upload to Vercel Blob
+- [x] Basic image editor (size presets, text overlay, logo, export)
+- [x] AI caption generation via OpenAI API
+- [x] Export flow (download image + copy caption)
+- [x] Quick Export directly from draft posts for solo workflows
+- [x] Posts page combining upload, editor, captions, review, and export
+- [x] Posts list with status display and selected-post editing
+- [x] Vercel Preview validation completed
+- [x] **Social Studio is now usable for real content creation**
+
+## Phase 2 Preview Validation
+
+Validated in Vercel Preview:
+
+- Workspace loads.
+- Draft creation/selection works.
+- Image upload works.
+- Uploaded image persists after refresh.
+- Image editor/save works.
+- AI caption generation works.
+- Caption/hashtags save and persist.
+- Quick Export works directly from draft.
+- Formal review workflow still works.
+- Exported state persists after refresh.
+
+Phase 2 is ready enough to move to Phase 3 calendar/scheduling work.

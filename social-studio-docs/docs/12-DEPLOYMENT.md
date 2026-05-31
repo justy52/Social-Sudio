@@ -38,8 +38,9 @@ git remote add origin https://github.com/YOUR_USERNAME/social-studio.git
 3. Add domain in Vercel project settings
 
 ### 6. Additional Services (add when needed)
-- **Anthropic API key** → Phase 2
-- **Vercel Blob token** → Phase 2 (auto-configured in Vercel)
+- **OpenAI API key** → Phase 2 captions
+- **Vercel Blob store connection/OIDC** → Phase 2 image storage
+- **Vercel Blob read-write token** → optional local fallback when OIDC is unavailable
 - **Resend API key** → optional Phase 3.5
 - **Meta App ID + Secret** → Phase 4
 - **Cron secret** → optional Phase 3.5 reminders and Phase 4 publishing

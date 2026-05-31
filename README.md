@@ -15,17 +15,18 @@ Start with the planning docs at [`social-studio-docs/README.md`](social-studio-d
 
 ## Current Status
 
-Phase 1 foundation is complete enough to proceed to controlled Phase 2 implementation.
+Phase 2 content MVP is validated in Vercel Preview and ready enough to move into Phase 3.
 
-- Local app runs at `http://127.0.0.1:5173`
-- Clerk login and test business creation work locally
-- Neon migration is applied with `users` and `businesses` tables
-- `/posts` and `/calendar` are placeholders only
-- Phase 2 database foundation has started with `posts` and `post_media`
-- Phase 2 posts API skeleton exists for draft create/list/view/update/delete
-- Phase 2 media upload API exists for image-only Vercel Blob uploads linked to post drafts
-- Minimal `/posts` UI exists for draft list/create/edit and image upload preview
-- No AI captions, editor, export, scheduling, or publishing features have been built yet
+- Workspace loading works in Preview.
+- Draft creation, selection, editing, and persistence work.
+- Image upload to Vercel Blob works, and uploaded images persist after refresh.
+- Basic image editor save works and creates edited media records.
+- AI caption generation works through the server-side OpenAI integration.
+- Captions and hashtags save correctly and persist after refresh.
+- Quick Export works directly from draft posts for solo workflows.
+- Formal review workflow still works: `draft` -> `ready_for_review` -> `approved` -> `exported`.
+- Export downloads the final edited image when available, falls back to the original image, copies caption text, and persists the exported state.
+- Calendar scheduling, direct publishing, analytics, billing, teams, ads, video, and templates are still out of scope/not built.
 
 See [`PHASE1_VALIDATION.md`](PHASE1_VALIDATION.md) and [`PHASE2_SCHEMA_PLAN.md`](PHASE2_SCHEMA_PLAN.md).
 
@@ -37,14 +38,16 @@ See [`PHASE1_VALIDATION.md`](PHASE1_VALIDATION.md) and [`PHASE2_SCHEMA_PLAN.md`]
 corepack pnpm install
 ```
 
-2. Copy `.env.example` to `.env.local` and fill in the Phase 1 values:
+2. Copy `.env.example` to `.env.local` and fill in the required values:
 
 ```env
 DATABASE_URL=
 VITE_CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
 CLERK_WEBHOOK_SECRET=
-BLOB_READ_WRITE_TOKEN=
+OPENAI_API_KEY=
+BLOB_STORE_ID=
+BLOB_WEBHOOK_PUBLIC_KEY=
 ```
 
 3. Generate and apply the database migration:
@@ -68,6 +71,6 @@ npx vercel dev --listen 5173
 
 ## Deployment Notes
 
-Deploy to Vercel as a Vite app with build command `corepack pnpm build` and output directory `dist`. Add the Phase 1 environment variables above in Vercel. The `vercel.json` rewrite keeps SPA routes working while preserving root `/api/*` serverless functions.
+Deploy to Vercel as a Vite app with build command `corepack pnpm build` and output directory `dist`. Add the required environment variables above in Vercel. The `vercel.json` rewrite keeps SPA routes working while preserving root `/api/*` serverless functions.
 
-Resend email reminders are optional Phase 3.5+ only. Do not add cron, Stripe, Meta publishing, market intelligence, or ad campaign features during Phase 1.
+Resend email reminders are optional Phase 3.5+ only. Do not add cron, Stripe, Meta publishing, market intelligence, or ad campaign features during Phase 3.
