@@ -10,9 +10,11 @@ import {
 } from '../src/lib/posts/client.ts';
 import { buildCaptionSelection } from '../src/lib/posts/captions-ui.ts';
 import {
+  applyQuickExportStatusTransitions,
   assertCanExportPost,
   buildFullPostText,
   formatHashtagsForPost,
+  getQuickExportStatusSequence,
   prepareManualExport,
   selectExportMedia,
 } from '../src/lib/posts/export.ts';
@@ -206,11 +208,74 @@ test('caption and hashtag clipboard text is formatted for manual posting', () =>
   );
 });
 
-test('export guard allows approved and exported posts only', () => {
+test('export guard allows quick export from draft review approved and exported posts', () => {
+  assert.doesNotThrow(() => assertCanExportPost('draft'));
+  assert.doesNotThrow(() => assertCanExportPost('ready_for_review'));
   assert.doesNotThrow(() => assertCanExportPost('approved'));
   assert.doesNotThrow(() => assertCanExportPost('exported'));
-  assert.throws(() => assertCanExportPost('draft'), /Approve this post/);
-  assert.throws(() => prepareManualExport({ ...exportDetail, post: { ...exportDetail.post, status: 'draft' } }), /Approve this post/);
+  assert.doesNotThrow(() =>
+    prepareManualExport({ ...exportDetail, post: { ...exportDetail.post, status: 'draft' } }),
+  );
+});
+
+test('quick export from draft performs required status transitions and ends exported', async () => {
+  const transitions: string[] = [];
+
+  const result = await applyQuickExportStatusTransitions('draft', async (status) => {
+    transitions.push(status);
+    return { status };
+  });
+
+  assert.deepEqual(transitions, ['ready_for_review', 'approved', 'exported']);
+  assert.equal(result?.status, 'exported');
+  assert.deepEqual(getQuickExportStatusSequence('draft'), [
+    'ready_for_review',
+    'approved',
+    'exported',
+  ]);
+});
+
+test('quick export from ready for review ends exported', async () => {
+  const transitions: string[] = [];
+
+  const result = await applyQuickExportStatusTransitions('ready_for_review', async (status) => {
+    transitions.push(status);
+    return { status };
+  });
+
+  assert.deepEqual(transitions, ['approved', 'exported']);
+  assert.equal(result?.status, 'exported');
+});
+
+test('approved export transitions directly to exported and re-export keeps status unchanged', async () => {
+  const approvedTransitions: string[] = [];
+  const exportedTransitions: string[] = [];
+
+  const approvedResult = await applyQuickExportStatusTransitions('approved', async (status) => {
+    approvedTransitions.push(status);
+    return { status };
+  });
+  const exportedResult = await applyQuickExportStatusTransitions('exported', async (status) => {
+    exportedTransitions.push(status);
+    return { status };
+  });
+
+  assert.deepEqual(approvedTransitions, ['exported']);
+  assert.equal(approvedResult?.status, 'exported');
+  assert.deepEqual(exportedTransitions, []);
+  assert.equal(exportedResult, null);
+});
+
+test('export blocks missing image and missing caption with clear messages', () => {
+  assert.throws(() => prepareManualExport({ ...exportDetail, media: [] }), /Add or save an image/);
+  assert.throws(
+    () =>
+      prepareManualExport({
+        ...exportDetail,
+        post: { ...exportDetail.post, caption: '   ' },
+      }),
+    /Add a caption/,
+  );
 });
 
 test('image editor parses supported size presets', () => {

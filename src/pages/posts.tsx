@@ -31,6 +31,7 @@ import {
   copyTextToClipboard,
   downloadImageFromUrl,
   formatHashtagsForPost,
+  applyQuickExportStatusTransitions,
   prepareManualExport,
   selectExportMedia,
 } from '@/lib/posts/export';
@@ -251,17 +252,33 @@ export function PostsPage() {
       await downloadImageFromUrl(prepared.media.blobUrl, prepared.fileName);
       await copyTextToClipboard(prepared.text);
 
-      return updatePost(getToken, selectedDetail.post.id, {
+      const baseUpdate = {
         caption: form.caption,
         hashtags,
         platform_size: form.platformSize,
         notes: form.notes,
         ai_generated: form.aiGenerated,
-        status: 'exported',
-      });
+      };
+      let updatedPost = selectedDetail.post;
+      const transitionedPost = await applyQuickExportStatusTransitions(
+        selectedDetail.post.status,
+        (status) =>
+          updatePost(getToken, selectedDetail.post.id, {
+            ...baseUpdate,
+            status,
+          }),
+      );
+
+      if (transitionedPost) {
+        updatedPost = transitionedPost;
+      } else {
+        updatedPost = await updatePost(getToken, selectedDetail.post.id, baseUpdate);
+      }
+
+      return updatedPost;
     },
     onSuccess: async () => {
-      setMessage('Image downloaded. Caption copied. Ready to post.');
+      setMessage('Image downloaded. Caption copied. Post marked exported.');
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] }),
@@ -536,6 +553,7 @@ function PostEditor({
     hashtags: parseHashtagsInput(form.hashtags),
   });
   const isExportable = canExportPost(detail.post.status);
+  const isQuickExport = detail.post.status === 'draft' || detail.post.status === 'ready_for_review';
 
   return (
     <Card>
@@ -683,11 +701,21 @@ function PostEditor({
               ? isExporting
                 ? 'Re-exporting'
                 : 'Re-export'
-              : isExporting
-                ? 'Exporting'
-                : 'Export'}
+              : detail.post.status === 'approved'
+                ? isExporting
+                  ? 'Exporting'
+                  : 'Export'
+                : isExporting
+                  ? 'Exporting'
+                  : 'Export Now'}
           </Button>
         </div>
+
+        {isQuickExport && (
+          <p className="text-sm text-muted-foreground">
+            Quick export skips the manual review steps for solo workflows.
+          </p>
+        )}
 
         {detail.post.status === 'exported' && (
           <div className="space-y-3 rounded-md border border-primary/20 bg-primary/10 p-4">
@@ -715,7 +743,7 @@ function PostEditor({
 
         {!isExportable && (
           <p className="text-sm text-muted-foreground">
-            Approve this post before exporting it for manual posting.
+            This post cannot be exported yet.
           </p>
         )}
 

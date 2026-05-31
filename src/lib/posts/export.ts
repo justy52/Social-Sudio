@@ -1,15 +1,50 @@
 import type { PostDetail, PostMediaRecord, PostRecord } from './client.ts';
+import type { PostStatus } from './status.ts';
 
-export type ExportablePostStatus = 'approved' | 'exported';
+export type ExportablePostStatus = PostStatus;
 
 export function canExportPost(status: PostRecord['status']) {
-  return status === 'approved' || status === 'exported';
+  return (
+    status === 'draft' ||
+    status === 'ready_for_review' ||
+    status === 'approved' ||
+    status === 'exported'
+  );
 }
 
 export function assertCanExportPost(status: PostRecord['status']) {
   if (!canExportPost(status)) {
-    throw new Error('Approve this post before exporting.');
+    throw new Error('This post cannot be exported.');
   }
+}
+
+export function getQuickExportStatusSequence(status: PostRecord['status']): PostStatus[] {
+  if (status === 'draft') {
+    return ['ready_for_review', 'approved', 'exported'];
+  }
+
+  if (status === 'ready_for_review') {
+    return ['approved', 'exported'];
+  }
+
+  if (status === 'approved') {
+    return ['exported'];
+  }
+
+  return [];
+}
+
+export async function applyQuickExportStatusTransitions<TPost>(
+  status: PostRecord['status'],
+  updateStatus: (status: PostStatus) => Promise<TPost>,
+) {
+  let result: TPost | null = null;
+
+  for (const nextStatus of getQuickExportStatusSequence(status)) {
+    result = await updateStatus(nextStatus);
+  }
+
+  return result;
 }
 
 export function selectExportMedia(media: PostMediaRecord[]) {
@@ -58,19 +93,24 @@ export function buildFullPostText(input: {
 
 export function prepareManualExport(detail: PostDetail) {
   assertCanExportPost(detail.post.status);
+  const text = buildFullPostText({
+    caption: detail.post.caption,
+    hashtags: detail.post.hashtags,
+  });
   const media = selectExportMedia(detail.media);
 
   if (!media) {
     throw new Error('Add or save an image before exporting.');
   }
 
+  if (!detail.post.caption?.trim()) {
+    throw new Error('Add a caption before exporting.');
+  }
+
   return {
     media,
     fileName: getExportFileName(detail.post, media),
-    text: buildFullPostText({
-      caption: detail.post.caption,
-      hashtags: detail.post.hashtags,
-    }),
+    text,
   };
 }
 
