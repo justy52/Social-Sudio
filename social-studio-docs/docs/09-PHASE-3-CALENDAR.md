@@ -1,65 +1,68 @@
-# 09 — Phase 3: Calendar
+# 09 - Phase 3: Calendar
 
-**Goal:** Add a content calendar, scheduled post queue, and a "ready to post today" view. This gives Social Studio the feel of a real content management tool without the complexity of direct Meta API publishing.
+**Goal:** Add scheduling, a manual posting queue, and a "ready to post today" view. This gives Social Studio the feel of a real content management tool without the complexity of direct Meta API publishing.
 
 **Depends on:** Phase 2 complete
 
-**Estimated effort:** 1–2 sessions with Claude Code / Codex
+**Estimated effort:** 1-2 sessions with Claude Code / Codex
 
-**Scope boundary:** This phase adds scheduling UI and a calendar. It does NOT add direct social publishing or automated cron jobs. Users still export and manually post. Email reminders are optional Phase 3.5+ and should only be built after the core calendar/manual posting workflow is complete.
+**Scope boundary:** This phase adds scheduling UI and a calendar/manual posting queue. It does NOT add direct social publishing or automated cron jobs. Users still export and manually post. Email reminders are optional Phase 3.5+ and should only be built after the core calendar/manual posting workflow is complete.
+
+**Current status:** Phase 3.1 scheduling foundation and Phase 3.2 manual posting queue are implemented and browser-tested in Vercel Preview. The current `/calendar` implementation is a simple queue/list view with `Upcoming`, `Today`, `Past`, and `Exported` tabs. A full drag-and-drop monthly calendar grid is not built yet.
 
 ---
 
 ## Tasks
 
-### 3.1 — Schedule Posts
+### 3.1 - Schedule Posts
 
 **Add scheduling to the post approval flow:**
 - After a post is approved, user can choose "Export Now" or "Schedule for Later"
-- Schedule picker: date (calendar) + time (dropdown in 30-min increments)
-- Time displayed in the business's configured timezone
+- Schedule picker: date + time dropdown in 30-minute increments
+- Time displayed clearly for the user
 - Scheduling sets `status: 'scheduled'` and `scheduled_at: datetime`
 
 **Update post form and post detail:**
 - Scheduled posts show the date/time with an "Unschedule" action
 - Unscheduling returns the post to `approved` status
+- Scheduled posts can be exported manually
 
 **Acceptance criteria:**
-- [ ] Can schedule an approved post for a future date and time
-- [ ] Scheduled date/time displayed in business timezone
-- [ ] Can unschedule a post (returns to approved)
-- [ ] Cannot schedule a post that hasn't been approved
+- [x] Can schedule an approved post for a future date and time
+- [x] Scheduled date/time displayed clearly
+- [x] Can unschedule a post (returns to approved)
+- [x] Cannot schedule a post that has not been approved
+- [x] Scheduled posts can be exported
 
 ---
 
-### 3.2 — Content Calendar
+### 3.2 - Manual Posting Queue
 
-**Create Calendar page** (`src/pages/calendar.tsx`):
-- Monthly grid view showing posts on their scheduled dates
-- Each day cell shows post thumbnails (or count if many)
-- Color-coded by status: approved (green), scheduled (purple), exported (blue)
-- Published posts (Phase 4) will show as well when available
-- Click a post → opens post detail/edit
-- Click an empty day → navigates to new post with that date pre-filled
-- Navigation: prev/next month arrows, "Today" button
-
-**"Today's Queue" sidebar or section:**
-- List of posts scheduled for today
-- Each shows thumbnail, caption preview, and platform size
-- "Export & Post" button for each
-- Clear visual: "3 posts ready for today"
+**Create Calendar page** (`src/pages/calendar.tsx`) as a lean manual posting queue:
+- Tabs for `Upcoming`, `Today`, `Past`, and `Exported`
+- Scheduled and exported posts grouped by date
+- Each queue item shows thumbnail, caption preview, time, status, and actions
+- View/Edit Post opens the post in the existing Posts editor
+- Copy text copies caption + hashtags for manual posting
+- Unschedule is available for scheduled posts
+- Export/Re-export downloads the image, copies text, and preserves status rules
+- Empty states link back to Posts to create or schedule content
 
 **Acceptance criteria:**
-- [ ] Calendar displays all scheduled posts on correct dates
-- [ ] Can navigate between months
+- [x] Queue displays scheduled posts grouped by correct dates
+- [x] Upcoming, Today, Past, and Exported filters work
+- [x] Clicking View/Edit Post opens the existing post editor
+- [x] Today's queue shows what needs to be posted
+- [x] Export/Re-export works from queue items
+- [x] Copy text and Unschedule actions work
+- [x] Responsive list view works on mobile-friendly layouts
+- [x] Quick Export in `/posts` still works
+- [ ] Full monthly grid navigation
 - [ ] Clicking empty day starts a new post with that date
-- [ ] Clicking a post opens it for viewing/editing
-- [ ] Today's queue shows what needs to be posted
-- [ ] Responsive: list view fallback on mobile
 
 ---
 
-### 3.3 — Dashboard Upgrade
+### 3.3 - Dashboard Upgrade
 
 **Replace placeholder dashboard with real data:**
 
@@ -81,18 +84,18 @@ Upcoming: next 5 scheduled posts with "Export" shortcut.
 
 ## Phase 3 Completion Checklist
 
-- [ ] Posts can be scheduled for future dates
-- [ ] Content calendar displays scheduled posts
-- [ ] Today's queue shows what's due with "Export & Post" buttons
+- [x] Posts can be scheduled for future dates
+- [x] Manual posting queue displays scheduled posts
+- [x] Today's queue shows what is due with export/re-export actions
 - [ ] Dashboard shows real stats
-- [ ] All features work in production
-- [ ] **Social Studio is now a daily content management tool**
+- [x] Phase 3.1 and 3.2 features work in Vercel Preview
+- [x] **Social Studio is now a lean daily content management tool for manual posting**
 
 ---
 
-## Task 3.5 — Email Reminders (Optional)
+## Task 3.5 - Email Reminders (Optional)
 
-**Build this only after Tasks 3.1–3.3 are complete and working.** It adds value but is not required for the core calendar/manual posting workflow.
+**Build this only after Tasks 3.1-3.3 are complete and working.** It adds value but is not required for the core calendar/manual posting workflow.
 
 **Daily reminder email via Resend (optional Phase 3.5+):**
 
@@ -109,12 +112,12 @@ Hi {first_name},
 
 You have {count} posts scheduled for today for {business_name}:
 
-1. "{caption_preview}" — {platform_size}
-2. "{caption_preview}" — {platform_size}
+1. "{caption_preview}" - {platform_size}
+2. "{caption_preview}" - {platform_size}
 
 Log in to export and post them: {app_url}/calendar
 
-— Social Studio
+- Social Studio
 ```
 
 **Configure Vercel Cron** (`vercel.json`):

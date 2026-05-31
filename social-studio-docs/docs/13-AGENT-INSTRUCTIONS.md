@@ -72,12 +72,13 @@ if (!business) return new Response('Not found', { status: 404 });
 Never prefix sensitive keys with `VITE_`. The only client-accessible env var is `VITE_CLERK_PUBLISHABLE_KEY`.
 
 ### Post status transitions
-Current Phase 2 database foundation only allows `draft`, `ready_for_review`, `approved`, and `exported`. Do not add `scheduled`, `published`, `failed`, or platform-specific statuses during this step.
+Current Phase 3 foundation allows `draft`, `ready_for_review`, `approved`, `scheduled`, and `exported`. Do not add `published`, `failed`, or platform-specific statuses until the relevant later phase.
 
 Enforce valid transitions. Do not allow arbitrary status changes:
 - `draft` → `ready_for_review`
 - `ready_for_review` → `approved` | `draft`
-- `approved` → `exported` | `draft`
+- `approved` → `scheduled` | `exported` | `draft`
+- `scheduled` → `approved` | `exported`
 
 ---
 

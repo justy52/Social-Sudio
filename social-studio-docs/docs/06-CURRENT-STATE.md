@@ -29,7 +29,7 @@ Vercel Blob OIDC upload behavior should be smoke-tested in Vercel Preview. Local
 
 ## Phase 2 Status
 
-Phase 2 content MVP is implemented and browser-tested in Vercel Preview. The workflow is ready enough to move into Phase 3.
+Phase 2 content MVP is implemented and browser-tested in Vercel Preview.
 
 ### Implemented
 
@@ -80,10 +80,52 @@ Formal review path:
 3. Approve.
 4. Export.
 
+## Phase 3 Status
+
+Phase 3.1 scheduling foundation and Phase 3.2 manual posting queue are implemented and browser-tested in Vercel Preview.
+
+### Implemented
+
+- `scheduled` post status.
+- Nullable `scheduled_at` / `scheduledAt` on posts.
+- Server-side schedule, unschedule, and scheduled-export status rules.
+- Scheduling controls in the existing Posts editor for approved posts.
+- `/calendar` manual posting queue.
+- Queue tabs for `Upcoming`, `Today`, `Past`, and `Exported`.
+- Queue items grouped by date.
+- Queue item thumbnail, caption preview, scheduled/exported time, status badge, and action controls.
+- View/Edit Post action linking back to the existing Posts editor.
+- Copy text action for manual posting.
+- Unschedule action for scheduled posts.
+- Export/Re-export actions from the queue.
+
+### Preview Validation
+
+The Phase 3.2 workflow has been validated in Vercel Preview:
+
+- Workspace loads.
+- Scheduled posts appear in the queue.
+- Upcoming, Today, Past, and Exported tabs work.
+- Queue items group by date.
+- Queue thumbnails, caption previews, time labels, status badges, and actions display correctly.
+- View/Edit Post, Copy text, Unschedule, Export, and Re-export work.
+- Quick Export in `/posts` still works.
+- Exported state persists after refresh.
+
+### Current User Workflow
+
+Manual posting queue path:
+
+1. Create and approve content in `/posts`.
+2. Schedule approved posts for a future date and time.
+3. Review due content in `/calendar`.
+4. Copy text, export/download the image, and post manually.
+5. Re-export exported posts if needed without changing ownership or status rules.
+
 ## Not Yet Built
 
-- Calendar scheduling.
-- Scheduled/manual posting calendar view.
+- Full drag-and-drop monthly calendar grid.
+- Dashboard upgrade with real Phase 3 metrics.
 - Email reminders.
 - Meta publishing.
 - Cron-based auto-publishing.
@@ -96,4 +138,4 @@ Formal review path:
 
 ## Next Controlled Pass
 
-Proceed to Phase 3 calendar/scheduling work. Keep direct publishing, Meta integration, analytics, billing, teams, ads, video, and templates out of scope.
+Proceed to the next controlled Phase 3 pass, likely dashboard metrics or a small calendar refinement. Keep email reminders, direct publishing, Meta integration, analytics, billing, teams, ads, video, and templates out of scope unless Justin explicitly selects that phase.

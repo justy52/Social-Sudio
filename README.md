@@ -15,7 +15,7 @@ Start with the planning docs at [`social-studio-docs/README.md`](social-studio-d
 
 ## Current Status
 
-Phase 2 content MVP is validated in Vercel Preview and ready enough to move into Phase 3.
+Phase 3.2 manual posting queue is validated in Vercel Preview. Social Studio now supports the core create, schedule, queue, export, and manual-post workflow.
 
 - Workspace loading works in Preview.
 - Draft creation, selection, editing, and persistence work.
@@ -26,7 +26,11 @@ Phase 2 content MVP is validated in Vercel Preview and ready enough to move into
 - Quick Export works directly from draft posts for solo workflows.
 - Formal review workflow still works: `draft` -> `ready_for_review` -> `approved` -> `exported`.
 - Export downloads the final edited image when available, falls back to the original image, copies caption text, and persists the exported state.
-- Calendar scheduling, direct publishing, analytics, billing, teams, ads, video, and templates are still out of scope/not built.
+- Scheduling works for approved posts, including unscheduling and exporting scheduled posts.
+- `/calendar` provides a manual posting queue with `Upcoming`, `Today`, `Past`, and `Exported` tabs.
+- Queue items group by date and show thumbnail, caption preview, scheduled/exported time, status, and actions.
+- View/Edit Post, Copy text, Unschedule, Export, and Re-export work from the queue.
+- Direct publishing, cron/email reminders, analytics, billing, teams, ads, video, and templates are still out of scope/not built.
 
 See [`PHASE1_VALIDATION.md`](PHASE1_VALIDATION.md) and [`PHASE2_SCHEMA_PLAN.md`](PHASE2_SCHEMA_PLAN.md).
 
