@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, CheckCircle2, Copy, ExternalLink, ImagePlus, RefreshCw } from 'lucide-react';
@@ -10,12 +10,14 @@ import { useBusinessContext } from '@/context/business-context';
 import {
   type CalendarQueueFilter,
   type CalendarQueuePost,
+  type TodayQueueSections,
   buildMarkPostedPayload,
   buildUnschedulePayload,
   buildUndoPostedPayload,
   canQueuePostExport,
   filterCalendarQueuePosts,
   getQueueThumbnailUrl,
+  getTodayQueueSections,
   groupCalendarQueuePosts,
   isQueuePostManuallyPosted,
 } from '@/lib/posts/calendar-queue';
@@ -72,6 +74,7 @@ export function CalendarPage() {
     () => groupCalendarQueuePosts(filteredPosts, activeBusiness?.timezone),
     [activeBusiness?.timezone, filteredPosts],
   );
+  const todaySections = useMemo(() => getTodayQueueSections(posts), [posts]);
   const todayCount = useMemo(
     () => filterCalendarQueuePosts(posts, 'today').length,
     [posts],
@@ -207,6 +210,20 @@ export function CalendarPage() {
             <CardDescription>Fetching scheduled posts for the selected business.</CardDescription>
           </CardHeader>
         </Card>
+      ) : activeFilter === 'today' ? (
+        <TodayQueueView
+          sections={todaySections}
+          timeZone={activeBusiness?.timezone}
+          isExporting={exportMutation.isPending}
+          isUnscheduling={unscheduleMutation.isPending}
+          isCopying={copyMutation.isPending}
+          isUpdatingPosted={postedMutation.isPending}
+          onExport={(post) => exportMutation.mutate(post)}
+          onUnschedule={(post) => unscheduleMutation.mutate(post)}
+          onCopy={(post) => copyMutation.mutate(buildFullPostText(post))}
+          onMarkPosted={(post) => postedMutation.mutate({ post, posted: true })}
+          onUndoPosted={(post) => postedMutation.mutate({ post, posted: false })}
+        />
       ) : groups.length === 0 ? (
         <CalendarEmptyState filter={activeFilter} />
       ) : (
@@ -242,6 +259,179 @@ export function CalendarPage() {
         </section>
       )}
     </div>
+  );
+}
+
+function TodayQueueView({
+  sections,
+  timeZone,
+  isExporting,
+  isUnscheduling,
+  isCopying,
+  isUpdatingPosted,
+  onExport,
+  onUnschedule,
+  onCopy,
+  onMarkPosted,
+  onUndoPosted,
+}: {
+  sections: TodayQueueSections;
+  timeZone: string | undefined;
+  isExporting: boolean;
+  isUnscheduling: boolean;
+  isCopying: boolean;
+  isUpdatingPosted: boolean;
+  onExport: (post: CalendarQueuePost) => void;
+  onUnschedule: (post: CalendarQueuePost) => void;
+  onCopy: (post: CalendarQueuePost) => void;
+  onMarkPosted: (post: CalendarQueuePost) => void;
+  onUndoPosted: (post: CalendarQueuePost) => void;
+}) {
+  if (sections.emptyState === 'no-posts') {
+    return <TodayEmptyState kind="no-posts" />;
+  }
+
+  return (
+    <section className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <QueueStat label="Remaining today" value={sections.remainingCount} />
+        <QueueStat label="Posted today" value={sections.postedCount} />
+      </div>
+
+      <TodayQueueSection
+        title="To Post Today"
+        count={sections.remainingCount}
+        posts={sections.remaining}
+        emptyState={sections.emptyState === 'all-posted' ? <TodayEmptyState kind="all-posted" /> : null}
+        timeZone={timeZone}
+        isExporting={isExporting}
+        isUnscheduling={isUnscheduling}
+        isCopying={isCopying}
+        isUpdatingPosted={isUpdatingPosted}
+        onExport={onExport}
+        onUnschedule={onUnschedule}
+        onCopy={onCopy}
+        onMarkPosted={onMarkPosted}
+        onUndoPosted={onUndoPosted}
+      />
+
+      {sections.postedCount > 0 && (
+        <TodayQueueSection
+          title="Posted Today"
+          count={sections.postedCount}
+          posts={sections.posted}
+          emptyState={null}
+          timeZone={timeZone}
+          isExporting={isExporting}
+          isUnscheduling={isUnscheduling}
+          isCopying={isCopying}
+          isUpdatingPosted={isUpdatingPosted}
+          onExport={onExport}
+          onUnschedule={onUnschedule}
+          onCopy={onCopy}
+          onMarkPosted={onMarkPosted}
+          onUndoPosted={onUndoPosted}
+        />
+      )}
+    </section>
+  );
+}
+
+function TodayQueueSection({
+  title,
+  count,
+  posts,
+  emptyState,
+  timeZone,
+  isExporting,
+  isUnscheduling,
+  isCopying,
+  isUpdatingPosted,
+  onExport,
+  onUnschedule,
+  onCopy,
+  onMarkPosted,
+  onUndoPosted,
+}: {
+  title: string;
+  count: number;
+  posts: CalendarQueuePost[];
+  emptyState: ReactNode;
+  timeZone: string | undefined;
+  isExporting: boolean;
+  isUnscheduling: boolean;
+  isCopying: boolean;
+  isUpdatingPosted: boolean;
+  onExport: (post: CalendarQueuePost) => void;
+  onUnschedule: (post: CalendarQueuePost) => void;
+  onCopy: (post: CalendarQueuePost) => void;
+  onMarkPosted: (post: CalendarQueuePost) => void;
+  onUndoPosted: (post: CalendarQueuePost) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
+          <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
+            {title}
+          </h2>
+        </div>
+        <Badge>{count}</Badge>
+      </div>
+
+      {posts.length === 0 ? (
+        emptyState
+      ) : (
+        <div className="space-y-3">
+          {posts.map((post) => (
+            <QueuePostCard
+              key={post.id}
+              post={post}
+              timeZone={timeZone}
+              isExporting={isExporting}
+              isUnscheduling={isUnscheduling}
+              isCopying={isCopying}
+              isUpdatingPosted={isUpdatingPosted}
+              onExport={() => onExport(post)}
+              onUnschedule={() => onUnschedule(post)}
+              onCopy={() => onCopy(post)}
+              onMarkPosted={() => onMarkPosted(post)}
+              onUndoPosted={() => onUndoPosted(post)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TodayEmptyState({ kind }: { kind: 'no-posts' | 'all-posted' }) {
+  const isComplete = kind === 'all-posted';
+
+  return (
+    <Card className={cn(isComplete && 'border-primary/20 bg-primary/5')}>
+      <CardHeader>
+        {isComplete ? (
+          <CheckCircle2 className="h-5 w-5 text-primary" aria-hidden="true" />
+        ) : (
+          <CalendarDays className="h-5 w-5 text-primary" aria-hidden="true" />
+        )}
+        <CardTitle>{isComplete ? 'All scheduled posts are posted' : 'No posts scheduled today'}</CardTitle>
+        <CardDescription>
+          {isComplete
+            ? 'Everything scheduled for today has been marked posted.'
+            : "Schedule approved content from Posts to build today's checklist."}
+        </CardDescription>
+      </CardHeader>
+      {!isComplete && (
+        <CardContent>
+          <Button type="button" asChild>
+            <Link to="/posts">Go to Posts</Link>
+          </Button>
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
@@ -285,9 +475,14 @@ function QueuePostCard({
   const isPosted = isQueuePostManuallyPosted(post);
 
   return (
-    <Card className={cn(isPosted && 'border-primary/30 bg-primary/5')}>
+    <Card className={cn(isPosted && 'border-border bg-muted/40')}>
       <CardContent className="grid gap-4 p-4 sm:grid-cols-[96px_minmax(0,1fr)]">
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+        <div
+          className={cn(
+            'flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border bg-muted',
+            isPosted && 'opacity-80',
+          )}
+        >
           {thumbnailUrl ? (
             <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -322,7 +517,7 @@ function QueuePostCard({
           )}
 
           <div>
-            <p className="line-clamp-2 text-sm font-medium">
+            <p className={cn('line-clamp-2 text-sm font-medium', isPosted && 'text-muted-foreground')}>
               {post.caption || 'No caption yet'}
             </p>
             {hashtags && (

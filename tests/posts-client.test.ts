@@ -25,6 +25,8 @@ import {
   buildUndoPostedPayload,
   canQueuePostExport,
   filterCalendarQueuePosts,
+  getTodayQueueEmptyState,
+  getTodayQueueSections,
   getQueueThumbnailUrl,
   groupCalendarQueuePosts,
   isQueuePostManuallyPosted,
@@ -841,6 +843,47 @@ test('today queue keeps manually posted scheduled items visible as complete', ()
     filterCalendarQueuePosts([...queuePosts, postedToday], 'today', now).map((post) => post.id),
     ['today', 'posted_today'],
   );
+});
+
+test('today queue separates posted and unposted items with counts', () => {
+  const now = new Date('2026-05-31T18:00:00.000Z');
+  const postedToday = buildQueuePost({
+    id: 'posted_today',
+    status: 'exported',
+    scheduledAt: '2026-05-31T16:00:00.000Z',
+    exportedAt: '2026-05-31T17:00:00.000Z',
+    manualPostedAt: '2026-05-31T17:15:00.000Z',
+  });
+  const sections = getTodayQueueSections([...queuePosts, postedToday], now);
+
+  assert.deepEqual(
+    sections.remaining.map((post) => post.id),
+    ['today'],
+  );
+  assert.deepEqual(
+    sections.posted.map((post) => post.id),
+    ['posted_today'],
+  );
+  assert.equal(sections.remainingCount, 1);
+  assert.equal(sections.postedCount, 1);
+  assert.equal(sections.emptyState, 'none');
+});
+
+test('today queue empty states distinguish no posts from all posted', () => {
+  const now = new Date('2026-05-31T18:00:00.000Z');
+  const postedToday = buildQueuePost({
+    id: 'posted_today',
+    status: 'exported',
+    scheduledAt: '2026-05-31T16:00:00.000Z',
+    exportedAt: '2026-05-31T17:00:00.000Z',
+    manualPostedAt: '2026-05-31T17:15:00.000Z',
+  });
+
+  assert.equal(getTodayQueueSections([queuePosts[0], queuePosts[2]], now).emptyState, 'no-posts');
+  assert.equal(getTodayQueueSections([postedToday], now).emptyState, 'all-posted');
+  assert.equal(getTodayQueueEmptyState(0, 0), 'no-posts');
+  assert.equal(getTodayQueueEmptyState(0, 2), 'all-posted');
+  assert.equal(getTodayQueueEmptyState(1, 2), 'none');
 });
 
 test('exported queue sorts manually posted items by completion time', () => {

@@ -14,6 +14,14 @@ export type CalendarQueueGroup = {
   posts: CalendarQueuePost[];
 };
 
+export type TodayQueueSections = {
+  remaining: CalendarQueuePost[];
+  posted: CalendarQueuePost[];
+  remainingCount: number;
+  postedCount: number;
+  emptyState: 'none' | 'no-posts' | 'all-posted';
+};
+
 export function filterCalendarQueuePosts(
   posts: PostSummary[],
   filter: CalendarQueueFilter,
@@ -56,6 +64,32 @@ export function filterCalendarQueuePosts(
       return scheduledDate >= today;
     })
     .sort(compareQueuePosts);
+}
+
+export function getTodayQueueSections(posts: PostSummary[], now = new Date()): TodayQueueSections {
+  const todayPosts = filterCalendarQueuePosts(posts, 'today', now);
+  const remaining = todayPosts.filter((post) => !isQueuePostManuallyPosted(post));
+  const posted = todayPosts.filter(isQueuePostManuallyPosted);
+
+  return {
+    remaining,
+    posted,
+    remainingCount: remaining.length,
+    postedCount: posted.length,
+    emptyState: getTodayQueueEmptyState(remaining.length, posted.length),
+  };
+}
+
+export function getTodayQueueEmptyState(remainingCount: number, postedCount: number) {
+  if (remainingCount === 0 && postedCount === 0) {
+    return 'no-posts' as const;
+  }
+
+  if (remainingCount === 0) {
+    return 'all-posted' as const;
+  }
+
+  return 'none' as const;
 }
 
 export function groupCalendarQueuePosts(
