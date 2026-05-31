@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
-import { loadServerEnv } from '../server-env';
-import * as schema from './schema';
+import { loadServerEnv } from '../server-env.ts';
+import * as schema from './schema.ts';
 
 loadServerEnv();
 

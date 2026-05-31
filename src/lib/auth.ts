@@ -1,10 +1,10 @@
 import type { VercelRequest } from '@vercel/node';
 import { createClerkClient, verifyToken } from '@clerk/backend';
 import { and, eq } from 'drizzle-orm';
-import { ApiError } from './api-helpers';
-import { db } from './db';
-import { businesses, postMedia, posts, users } from './db/schema';
-import { loadServerEnv } from './server-env';
+import { ApiError } from './api-helpers.ts';
+import { db } from './db/index.ts';
+import { businesses, postMedia, posts, users } from './db/schema.ts';
+import { loadServerEnv } from './server-env.ts';
 
 loadServerEnv();
 

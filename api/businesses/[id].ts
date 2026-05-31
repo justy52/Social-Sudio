@@ -7,11 +7,11 @@ import {
   methodNotAllowed,
   parseJsonBody,
   sendJson,
-} from '../../src/lib/api-helpers';
-import { requireBusinessOwnership } from '../../src/lib/auth';
-import { db } from '../../src/lib/db';
-import { businesses } from '../../src/lib/db/schema';
-import { businessUpdateSchema } from '../../src/lib/validation';
+} from '../../src/lib/api-helpers.ts';
+import { requireBusinessOwnership } from '../../src/lib/auth.ts';
+import { db } from '../../src/lib/db/index.ts';
+import { businesses } from '../../src/lib/db/schema.ts';
+import { businessUpdateSchema } from '../../src/lib/validation.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {

@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { eq } from 'drizzle-orm';
 import { Webhook } from 'svix';
-import { ApiError, handleApiError, sendJson } from '../../src/lib/api-helpers';
-import { db } from '../../src/lib/db';
-import { users } from '../../src/lib/db/schema';
+import { ApiError, handleApiError, sendJson } from '../../src/lib/api-helpers.ts';
+import { db } from '../../src/lib/db/index.ts';
+import { users } from '../../src/lib/db/schema.ts';
 
 interface ClerkWebhookEvent {
   type: 'user.created' | 'user.updated' | 'user.deleted' | string;

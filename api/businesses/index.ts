@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { asc, eq } from 'drizzle-orm';
-import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from '../../src/lib/api-helpers';
-import { requireAuth, syncCurrentUserFromClerk } from '../../src/lib/auth';
-import { db } from '../../src/lib/db';
-import { businesses } from '../../src/lib/db/schema';
-import { createBusinessSlug } from '../../src/lib/slug';
-import { businessCreateSchema } from '../../src/lib/validation';
+import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from '../../src/lib/api-helpers.ts';
+import { requireAuth, syncCurrentUserFromClerk } from '../../src/lib/auth.ts';
+import { db } from '../../src/lib/db/index.ts';
+import { businesses } from '../../src/lib/db/schema.ts';
+import { createBusinessSlug } from '../../src/lib/slug.ts';
+import { businessCreateSchema } from '../../src/lib/validation.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {

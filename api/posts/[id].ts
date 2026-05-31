@@ -7,12 +7,12 @@ import {
   methodNotAllowed,
   parseJsonBody,
   sendJson,
-} from '../../src/lib/api-helpers';
-import { requirePostOwnership } from '../../src/lib/auth';
-import { db } from '../../src/lib/db';
-import { postMedia, posts } from '../../src/lib/db/schema';
-import { buildUpdatePostValues } from '../../src/lib/posts/api';
-import { postIdSchema, postUpdateSchema } from '../../src/lib/validation';
+} from '../../src/lib/api-helpers.ts';
+import { requirePostOwnership } from '../../src/lib/auth.ts';
+import { db } from '../../src/lib/db/index.ts';
+import { postMedia, posts } from '../../src/lib/db/schema.ts';
+import { buildUpdatePostValues } from '../../src/lib/posts/api.ts';
+import { postIdSchema, postUpdateSchema } from '../../src/lib/validation.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {

@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from '../../src/lib/api-helpers';
-import { requireBusinessOwnership } from '../../src/lib/auth';
-import { assertOwnedBusinessForCaptions, generateCaption } from '../../src/lib/ai/captions';
-import { captionGenerateSchema } from '../../src/lib/validation';
+import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from '../../src/lib/api-helpers.ts';
+import { requireBusinessOwnership } from '../../src/lib/auth.ts';
+import { assertOwnedBusinessForCaptions, generateCaption } from '../../src/lib/ai/captions.ts';
+import { captionGenerateSchema } from '../../src/lib/validation.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {

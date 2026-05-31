@@ -6,12 +6,12 @@ import {
   handleApiError,
   methodNotAllowed,
   sendJson,
-} from '../../src/lib/api-helpers';
-import { requireAuth, requirePostMediaOwnership } from '../../src/lib/auth';
-import { db } from '../../src/lib/db';
-import { postMedia } from '../../src/lib/db/schema';
-import { assertOwnedMediaForDelete, deletePostMedia } from '../../src/lib/media/api';
-import { vercelBlobStorage } from '../../src/lib/media/blob';
+} from '../../src/lib/api-helpers.ts';
+import { requireAuth, requirePostMediaOwnership } from '../../src/lib/auth.ts';
+import { db } from '../../src/lib/db/index.ts';
+import { postMedia } from '../../src/lib/db/schema.ts';
+import { assertOwnedMediaForDelete, deletePostMedia } from '../../src/lib/media/api.ts';
+import { vercelBlobStorage } from '../../src/lib/media/blob.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {

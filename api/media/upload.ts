@@ -1,18 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ApiError, handleApiError, methodNotAllowed, sendJson } from '../../src/lib/api-helpers';
-import { requireAuth, requirePostOwnership } from '../../src/lib/auth';
-import { db } from '../../src/lib/db';
-import { postMedia } from '../../src/lib/db/schema';
+import { ApiError, handleApiError, methodNotAllowed, sendJson } from '../../src/lib/api-helpers.ts';
+import { requireAuth, requirePostOwnership } from '../../src/lib/auth.ts';
+import { db } from '../../src/lib/db/index.ts';
+import { postMedia } from '../../src/lib/db/schema.ts';
 import {
   assertMediaUploadAuthenticated,
   assertOwnedPostForMediaUpload,
   getBlobStorageAuth,
   logMediaUploadDiagnostics,
   uploadPostMedia,
-} from '../../src/lib/media/api';
-import { vercelBlobStorage } from '../../src/lib/media/blob';
-import { parseMultipartFormData } from '../../src/lib/media/multipart';
-import { postIdSchema } from '../../src/lib/validation';
+} from '../../src/lib/media/api.ts';
+import { vercelBlobStorage } from '../../src/lib/media/blob.ts';
+import { parseMultipartFormData } from '../../src/lib/media/multipart.ts';
+import { postIdSchema } from '../../src/lib/validation.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {

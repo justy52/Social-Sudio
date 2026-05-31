@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
-import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from '../../src/lib/api-helpers';
-import { requireAuth, requireBusinessOwnership } from '../../src/lib/auth';
-import { db } from '../../src/lib/db';
-import { businesses, postMedia, posts } from '../../src/lib/db/schema';
-import { buildCreatePostValues, mapOwnedPostRows } from '../../src/lib/posts/api';
-import { postCreateSchema, postListQuerySchema } from '../../src/lib/validation';
+import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from '../../src/lib/api-helpers.ts';
+import { requireAuth, requireBusinessOwnership } from '../../src/lib/auth.ts';
+import { db } from '../../src/lib/db/index.ts';
+import { businesses, postMedia, posts } from '../../src/lib/db/schema.ts';
+import { buildCreatePostValues, mapOwnedPostRows } from '../../src/lib/posts/api.ts';
+import { postCreateSchema, postListQuerySchema } from '../../src/lib/validation.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
