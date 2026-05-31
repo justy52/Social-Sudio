@@ -15,6 +15,7 @@ export type PreviewMediaLike = {
 
 export type PostPreviewLike = {
   firstMedia?: PreviewMediaLike | null;
+  finalMedia?: PreviewMediaLike | null;
 };
 
 export function getAvailableStatusOptions(status: PostStatus) {
@@ -45,4 +46,8 @@ export function validateClientImageFile(file: ImageLike) {
 
 export function getFirstMediaPreviewUrl(post: PostPreviewLike) {
   return post.firstMedia?.blobUrl ?? null;
+}
+
+export function getFinalMediaPreviewUrl(post: PostPreviewLike) {
+  return post.finalMedia?.blobUrl ?? post.firstMedia?.blobUrl ?? null;
 }

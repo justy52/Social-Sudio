@@ -7,6 +7,7 @@ import {
   uploadEditedPostImage,
   uploadPostImage,
   type PostDetail,
+  type PostSummary,
 } from '../src/lib/posts/client.ts';
 import { buildCaptionSelection } from '../src/lib/posts/captions-ui.ts';
 import {
@@ -19,6 +20,14 @@ import {
   selectExportMedia,
 } from '../src/lib/posts/export.ts';
 import {
+  buildUnschedulePayload,
+  canQueuePostExport,
+  filterCalendarQueuePosts,
+  getQueueThumbnailUrl,
+  groupCalendarQueuePosts,
+  type CalendarQueueFilter,
+} from '../src/lib/posts/calendar-queue.ts';
+import {
   buildEditedImageFileName,
   buildEditedImageUploadFormData,
   calculateImageDrawRect,
@@ -26,6 +35,7 @@ import {
 } from '../src/lib/posts/image-editor.ts';
 import {
   getAvailableStatusOptions,
+  getFinalMediaPreviewUrl,
   getFirstMediaPreviewUrl,
   validateClientImageFile,
 } from '../src/lib/posts/ui.ts';
@@ -556,6 +566,50 @@ test('client payload sends scheduled_at correctly', async () => {
   }
 });
 
+test('unschedule action sends the correct update payload', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (input, init) => {
+    const body = JSON.parse(String(init?.body));
+
+    assert.equal(input, '/api/posts/post_1');
+    assert.equal(init?.method, 'PUT');
+    assert.deepEqual(body, {
+      status: 'approved',
+      scheduled_at: null,
+    });
+
+    return new Response(
+      JSON.stringify({
+        post: {
+          id: 'post_1',
+          businessId: 'business_1',
+          status: 'approved',
+          caption: 'Finished cedar privacy fence.',
+          hashtags: ['#FenceLife'],
+          platformSize: '1080x1080',
+          notes: null,
+          aiGenerated: false,
+          scheduledAt: null,
+          exportedAt: null,
+          createdAt: '2026-05-31T00:00:00.000Z',
+          updatedAt: '2026-05-31T12:00:00.000Z',
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  };
+
+  try {
+    const post = await updatePost(async () => 'test-token', 'post_1', buildUnschedulePayload());
+
+    assert.equal(post.status, 'approved');
+    assert.equal(post.scheduledAt, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('client request errors stay safe for export actions', async () => {
   const originalFetch = globalThis.fetch;
 
@@ -630,4 +684,135 @@ test('media preview URL comes from the API response shape', () => {
     }),
     'https://blob.example/businesses/biz/posts/post/image.png',
   );
+  assert.equal(
+    getFinalMediaPreviewUrl({
+      firstMedia: {
+        blobUrl: 'https://blob.example/businesses/biz/posts/post/original.png',
+      },
+      finalMedia: {
+        blobUrl: 'https://blob.example/businesses/biz/posts/post/edited.png',
+      },
+    }),
+    'https://blob.example/businesses/biz/posts/post/edited.png',
+  );
 });
+
+const queuePosts = [
+  buildQueuePost({
+    id: 'past',
+    status: 'scheduled',
+    scheduledAt: '2026-05-30T16:00:00.000Z',
+  }),
+  buildQueuePost({
+    id: 'today',
+    status: 'scheduled',
+    scheduledAt: '2026-05-31T16:00:00.000Z',
+  }),
+  buildQueuePost({
+    id: 'upcoming',
+    status: 'scheduled',
+    scheduledAt: '2026-06-02T16:00:00.000Z',
+  }),
+  buildQueuePost({
+    id: 'exported',
+    status: 'exported',
+    scheduledAt: '2026-05-29T16:00:00.000Z',
+    exportedAt: '2026-06-01T16:00:00.000Z',
+  }),
+];
+
+test('calendar queue filters upcoming today past and exported posts', () => {
+  const now = new Date('2026-05-31T12:00:00.000Z');
+  const idsByFilter = (filter: CalendarQueueFilter) =>
+    filterCalendarQueuePosts(queuePosts, filter, now).map((post) => post.id);
+
+  assert.deepEqual(idsByFilter('today'), ['today']);
+  assert.deepEqual(idsByFilter('past'), ['past']);
+  assert.deepEqual(idsByFilter('upcoming'), ['today', 'upcoming']);
+  assert.deepEqual(idsByFilter('exported'), ['exported']);
+});
+
+test('calendar queue groups scheduled posts by date', () => {
+  const groups = groupCalendarQueuePosts(
+    filterCalendarQueuePosts(queuePosts, 'upcoming', new Date('2026-05-31T12:00:00.000Z')),
+  );
+
+  assert.deepEqual(
+    groups.map((group) => ({
+      dateKey: group.dateKey,
+      postIds: group.posts.map((post) => post.id),
+    })),
+    [
+      { dateKey: '2026-05-31', postIds: ['today'] },
+      { dateKey: '2026-06-02', postIds: ['upcoming'] },
+    ],
+  );
+});
+
+test('calendar queue thumbnail prefers final edited media', () => {
+  const post = buildQueuePost({
+    firstMedia: {
+      id: 'original',
+      postId: 'post_1',
+      blobUrl: 'https://blob.example/original.png',
+      blobKey: 'original.png',
+      mimeType: 'image/png',
+      width: null,
+      height: null,
+      isEdited: false,
+      originalUrl: null,
+      createdAt: '2026-05-31T00:00:00.000Z',
+      updatedAt: '2026-05-31T00:00:00.000Z',
+    },
+    finalMedia: {
+      id: 'edited',
+      postId: 'post_1',
+      blobUrl: 'https://blob.example/edited.png',
+      blobKey: 'edited.png',
+      mimeType: 'image/png',
+      width: 1080,
+      height: 1080,
+      isEdited: true,
+      originalUrl: 'https://blob.example/original.png',
+      createdAt: '2026-05-31T00:00:00.000Z',
+      updatedAt: '2026-05-31T00:00:00.000Z',
+    },
+  });
+
+  assert.equal(getQueueThumbnailUrl(post), 'https://blob.example/edited.png');
+  assert.equal(canQueuePostExport(post), true);
+  assert.equal(canQueuePostExport({ ...post, caption: '' }), false);
+});
+
+function buildQueuePost(overrides: Partial<PostSummary> = {}): PostSummary {
+  return {
+    id: 'post_1',
+    businessId: 'business_1',
+    status: 'scheduled' as const,
+    caption: 'Finished cedar privacy fence.',
+    hashtags: ['#FenceLife'],
+    platformSize: '1080x1080',
+    notes: null,
+    aiGenerated: false,
+    scheduledAt: '2026-05-31T16:00:00.000Z',
+    exportedAt: null,
+    createdAt: '2026-05-31T00:00:00.000Z',
+    updatedAt: '2026-05-31T12:00:00.000Z',
+    mediaCount: 1,
+    firstMedia: {
+      id: 'media_1',
+      postId: 'post_1',
+      blobUrl: 'https://blob.example/original.png',
+      blobKey: 'original.png',
+      mimeType: 'image/png',
+      width: null,
+      height: null,
+      isEdited: false,
+      originalUrl: null,
+      createdAt: '2026-05-31T00:00:00.000Z',
+      updatedAt: '2026-05-31T00:00:00.000Z',
+    },
+    finalMedia: null,
+    ...overrides,
+  };
+}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, ImagePlus, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { CaptionGenerator } from '@/components/posts/caption-generator';
 import { ImageEditor } from '@/components/posts/image-editor';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +79,7 @@ export function PostsPage() {
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
   const { activeBusiness } = useBusinessContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [form, setForm] = useState<PostFormState>(emptyForm);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -90,6 +92,14 @@ export function PostsPage() {
     setMessage(null);
     setError(null);
   }, [activeBusiness?.id]);
+
+  useEffect(() => {
+    const postId = searchParams.get('post_id');
+
+    if (postId) {
+      setSelectedPostId(postId);
+    }
+  }, [searchParams]);
 
   const postsQuery = useQuery({
     queryKey: ['posts', activeBusiness?.id],
@@ -447,7 +457,10 @@ export function PostsPage() {
                 key={post.id}
                 post={post}
                 isSelected={post.id === selectedPostId}
-                onSelect={() => setSelectedPostId(post.id)}
+                onSelect={() => {
+                  setSelectedPostId(post.id);
+                  setSearchParams({ post_id: post.id });
+                }}
               />
             ))
           )}

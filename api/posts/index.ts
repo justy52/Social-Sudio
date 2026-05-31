@@ -87,6 +87,7 @@ async function addMediaSummaries(postRows: (typeof posts.$inferSelect)[]) {
       ...post,
       mediaCount: media.length,
       firstMedia: media[0] ?? null,
+      finalMedia: media.find((item) => item.isEdited) ?? media[0] ?? null,
     };
   });
 }

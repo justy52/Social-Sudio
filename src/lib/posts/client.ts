@@ -36,6 +36,7 @@ export type PostRecord = {
 export type PostSummary = PostRecord & {
   mediaCount?: number;
   firstMedia?: PostMediaRecord | null;
+  finalMedia?: PostMediaRecord | null;
 };
 
 export type PostDetail = {
