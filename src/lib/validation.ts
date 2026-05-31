@@ -85,6 +85,7 @@ export const postUpdateSchema = z
     ai_generated: z.boolean().optional(),
     status: z.enum(postStatuses).optional(),
     scheduled_at: isoDateStringField.nullable().optional(),
+    manual_posted: z.boolean().optional(),
   })
   .strict()
   .refine((input) => Object.values(input).some((value) => value !== undefined), {
@@ -99,6 +100,7 @@ export const postUpdateSchema = z
       aiGenerated?: boolean;
       status?: (typeof postStatuses)[number];
       scheduledAt?: Date | null;
+      manualPosted?: boolean;
     } = {};
 
     if (input.caption !== undefined) output.caption = input.caption;
@@ -110,6 +112,7 @@ export const postUpdateSchema = z
     if (input.scheduled_at !== undefined) {
       output.scheduledAt = input.scheduled_at === null ? null : new Date(input.scheduled_at);
     }
+    if (input.manual_posted !== undefined) output.manualPosted = input.manual_posted;
 
     return output;
   });

@@ -74,6 +74,7 @@ export function buildUpdatePostValues(
     status?: PostStatus;
     scheduledAt?: Date | null;
     exportedAt?: Date;
+    manualPostedAt?: Date | null;
     updatedAt: Date;
   } = {
     updatedAt: now,
@@ -84,6 +85,35 @@ export function buildUpdatePostValues(
   if (input.platformSize !== undefined) values.platformSize = input.platformSize;
   if (input.notes !== undefined) values.notes = input.notes;
   if (input.aiGenerated !== undefined) values.aiGenerated = input.aiGenerated;
+
+  if (input.manualPosted !== undefined) {
+    if (!isPostStatus(currentStatusValue)) {
+      throw new ApiError(500, 'Post has an unsupported status');
+    }
+
+    if (input.manualPosted) {
+      if (currentStatusValue === 'scheduled') {
+        values.status = 'exported';
+        values.exportedAt = now;
+        values.manualPostedAt = now;
+        return values;
+      }
+
+      if (currentStatusValue === 'exported') {
+        values.manualPostedAt = now;
+        return values;
+      }
+
+      throw new ApiError(400, 'Export or schedule this post before marking it posted.');
+    }
+
+    if (currentStatusValue !== 'exported') {
+      throw new ApiError(400, 'Only exported posts can clear posted completion.');
+    }
+
+    values.manualPostedAt = null;
+    return values;
+  }
 
   if (input.status !== undefined) {
     if (!isPostStatus(currentStatusValue)) {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { ApiError } from '../src/lib/api-helpers.ts';
 import {
@@ -9,6 +10,16 @@ import {
   mapOwnedPostRows,
 } from '../src/lib/posts/api.ts';
 import { postCreateSchema, postUpdateSchema } from '../src/lib/validation.ts';
+
+test('manual posted migration adds nullable timestamp and business index', () => {
+  const migration = readFileSync(
+    new URL('../src/lib/db/migrations/0003_curvy_sheva_callister.sql', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(migration, /ADD COLUMN "manual_posted_at" timestamp with time zone/);
+  assert.match(migration, /idx_posts_business_manual_posted/);
+});
 
 test('create post requires an owned business', () => {
   assert.doesNotThrow(() => assertOwnedBusinessForPosts({ userId: 'user_1' }, 'user_1'));
@@ -138,6 +149,15 @@ test('approved to scheduled requires scheduled_at in the future', () => {
   );
 });
 
+test('manual_posted_at is server-controlled only', () => {
+  assert.throws(() =>
+    postUpdateSchema.parse({
+      manual_posted: true,
+      manual_posted_at: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+});
+
 test('draft to scheduled is rejected', () => {
   const input = postUpdateSchema.parse({
     status: 'scheduled',
@@ -183,4 +203,40 @@ test('scheduled to exported sets exported_at server-side and keeps schedule cont
   assert.equal(values.status, 'exported');
   assert.equal(values.exportedAt, now);
   assert.equal(values.scheduledAt, undefined);
+});
+
+test('scheduled manual posted action ends exported and sets server timestamps', () => {
+  const now = new Date('2026-05-28T00:00:00.000Z');
+  const input = postUpdateSchema.parse({ manual_posted: true });
+  const values = buildUpdatePostValues('scheduled', input, now);
+
+  assert.equal(values.status, 'exported');
+  assert.equal(values.exportedAt, now);
+  assert.equal(values.manualPostedAt, now);
+});
+
+test('exported manual posted action sets manual_posted_at without changing status', () => {
+  const now = new Date('2026-05-28T00:00:00.000Z');
+  const input = postUpdateSchema.parse({ manual_posted: true });
+  const values = buildUpdatePostValues('exported', input, now);
+
+  assert.equal(values.status, undefined);
+  assert.equal(values.exportedAt, undefined);
+  assert.equal(values.manualPostedAt, now);
+});
+
+test('draft review and approved posts cannot be marked manually posted', () => {
+  const input = postUpdateSchema.parse({ manual_posted: true });
+
+  assert.throws(() => buildUpdatePostValues('draft', input), /Export or schedule/);
+  assert.throws(() => buildUpdatePostValues('ready_for_review', input), /Export or schedule/);
+  assert.throws(() => buildUpdatePostValues('approved', input), /Export or schedule/);
+});
+
+test('undo manual posted clears timestamp and leaves exported status unchanged', () => {
+  const input = postUpdateSchema.parse({ manual_posted: false });
+  const values = buildUpdatePostValues('exported', input, new Date('2026-05-28T00:00:00.000Z'));
+
+  assert.equal(values.status, undefined);
+  assert.equal(values.manualPostedAt, null);
 });

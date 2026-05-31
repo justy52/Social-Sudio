@@ -25,6 +25,10 @@ export function filterCalendarQueuePosts(
         return post.status === 'exported';
       }
 
+      if (filter === 'today' && post.status === 'exported' && Boolean(post.manualPostedAt)) {
+        return true;
+      }
+
       return post.status === 'scheduled' && Boolean(post.scheduledAt);
     })
     .filter((post) => {
@@ -32,7 +36,7 @@ export function filterCalendarQueuePosts(
         return true;
       }
 
-      const scheduledAt = post.scheduledAt;
+      const scheduledAt = readQueueFilterDate(post, filter);
 
       if (!scheduledAt) {
         return false;
@@ -89,6 +93,22 @@ export function buildUnschedulePayload() {
   };
 }
 
+export function buildMarkPostedPayload() {
+  return {
+    manual_posted: true,
+  };
+}
+
+export function buildUndoPostedPayload() {
+  return {
+    manual_posted: false,
+  };
+}
+
+export function isQueuePostManuallyPosted(post: { manualPostedAt: string | null }) {
+  return Boolean(post.manualPostedAt);
+}
+
 function compareQueuePosts(left: CalendarQueuePost, right: CalendarQueuePost) {
   const leftDate = readQueueSortDate(left);
   const rightDate = readQueueSortDate(right);
@@ -97,11 +117,23 @@ function compareQueuePosts(left: CalendarQueuePost, right: CalendarQueuePost) {
 }
 
 function readQueueSortDate(post: CalendarQueuePost) {
+  if (post.manualPostedAt) {
+    return new Date(post.manualPostedAt);
+  }
+
   if (post.status === 'exported') {
     return new Date(post.exportedAt ?? post.updatedAt);
   }
 
   return new Date(post.scheduledAt ?? post.updatedAt);
+}
+
+function readQueueFilterDate(post: CalendarQueuePost, filter: CalendarQueueFilter) {
+  if (filter === 'today' && post.status === 'exported') {
+    return post.manualPostedAt ?? post.scheduledAt ?? post.exportedAt;
+  }
+
+  return post.scheduledAt;
 }
 
 function getPostDateKey(post: CalendarQueuePost) {

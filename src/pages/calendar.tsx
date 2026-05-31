@@ -10,11 +10,14 @@ import { useBusinessContext } from '@/context/business-context';
 import {
   type CalendarQueueFilter,
   type CalendarQueuePost,
+  buildMarkPostedPayload,
   buildUnschedulePayload,
+  buildUndoPostedPayload,
   canQueuePostExport,
   filterCalendarQueuePosts,
   getQueueThumbnailUrl,
   groupCalendarQueuePosts,
+  isQueuePostManuallyPosted,
 } from '@/lib/posts/calendar-queue';
 import {
   getPost,
@@ -113,6 +116,24 @@ export function CalendarPage() {
     },
   });
 
+  const postedMutation = useMutation({
+    mutationFn: (input: { post: CalendarQueuePost; posted: boolean }) =>
+      updatePost(
+        getToken,
+        input.post.id,
+        input.posted ? buildMarkPostedPayload() : buildUndoPostedPayload(),
+      ),
+    onSuccess: async (_post, input) => {
+      setMessage(input.posted ? 'Post marked as manually posted.' : 'Posted completion undone.');
+      setError(null);
+      await queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] });
+    },
+    onError: (mutationError) => {
+      setError(readError(mutationError, 'Could not update posted completion.'));
+      setMessage(null);
+    },
+  });
+
   const copyMutation = useMutation({
     mutationFn: (text: string) => copyTextToClipboard(text),
     onSuccess: () => {
@@ -207,9 +228,12 @@ export function CalendarPage() {
                     isExporting={exportMutation.isPending}
                     isUnscheduling={unscheduleMutation.isPending}
                     isCopying={copyMutation.isPending}
+                    isUpdatingPosted={postedMutation.isPending}
                     onExport={() => exportMutation.mutate(post)}
                     onUnschedule={() => unscheduleMutation.mutate(post)}
                     onCopy={() => copyMutation.mutate(buildFullPostText(post))}
+                    onMarkPosted={() => postedMutation.mutate({ post, posted: true })}
+                    onUndoPosted={() => postedMutation.mutate({ post, posted: false })}
                   />
                 ))}
               </div>
@@ -236,25 +260,32 @@ function QueuePostCard({
   isExporting,
   isUnscheduling,
   isCopying,
+  isUpdatingPosted,
   onExport,
   onUnschedule,
   onCopy,
+  onMarkPosted,
+  onUndoPosted,
 }: {
   post: CalendarQueuePost;
   timeZone: string | undefined;
   isExporting: boolean;
   isUnscheduling: boolean;
   isCopying: boolean;
+  isUpdatingPosted: boolean;
   onExport: () => void;
   onUnschedule: () => void;
   onCopy: () => void;
+  onMarkPosted: () => void;
+  onUndoPosted: () => void;
 }) {
   const thumbnailUrl = getQueueThumbnailUrl(post);
   const hashtags = formatHashtagsForPost(post.hashtags);
   const canExport = canQueuePostExport(post);
+  const isPosted = isQueuePostManuallyPosted(post);
 
   return (
-    <Card>
+    <Card className={cn(isPosted && 'border-primary/30 bg-primary/5')}>
       <CardContent className="grid gap-4 p-4 sm:grid-cols-[96px_minmax(0,1fr)]">
         <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
           {thumbnailUrl ? (
@@ -276,7 +307,19 @@ function QueuePostCard({
                   : 'No scheduled time'}
             </span>
             <span className="text-xs text-muted-foreground">{post.platformSize}</span>
+            {isPosted && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                Posted manually
+              </span>
+            )}
           </div>
+
+          {post.manualPostedAt && (
+            <p className="text-xs text-muted-foreground">
+              Posted manually {formatDateTime(post.manualPostedAt, timeZone)}
+            </p>
+          )}
 
           <div>
             <p className="line-clamp-2 text-sm font-medium">
@@ -314,6 +357,28 @@ function QueuePostCard({
                 disabled={isUnscheduling}
               >
                 Unschedule
+              </Button>
+            )}
+            {isPosted ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={onUndoPosted}
+                disabled={isUpdatingPosted}
+              >
+                Undo posted
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onMarkPosted}
+                disabled={isUpdatingPosted}
+              >
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                Mark Posted
               </Button>
             )}
             <Button

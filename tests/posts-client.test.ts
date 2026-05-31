@@ -21,10 +21,13 @@ import {
 } from '../src/lib/posts/export.ts';
 import {
   buildUnschedulePayload,
+  buildMarkPostedPayload,
+  buildUndoPostedPayload,
   canQueuePostExport,
   filterCalendarQueuePosts,
   getQueueThumbnailUrl,
   groupCalendarQueuePosts,
+  isQueuePostManuallyPosted,
   type CalendarQueueFilter,
 } from '../src/lib/posts/calendar-queue.ts';
 import {
@@ -63,6 +66,7 @@ test('createDraftPost calls the posts API with the selected business id', async 
           aiGenerated: false,
           scheduledAt: null,
           exportedAt: null,
+          manualPostedAt: null,
           createdAt: '2026-05-28T00:00:00.000Z',
           updatedAt: '2026-05-28T00:00:00.000Z',
         },
@@ -156,6 +160,7 @@ const exportDetail: PostDetail = {
     aiGenerated: false,
     scheduledAt: null,
     exportedAt: null,
+    manualPostedAt: null,
     createdAt: '2026-05-31T00:00:00.000Z',
     updatedAt: '2026-05-31T00:00:00.000Z',
   },
@@ -500,6 +505,7 @@ test('export status update is sent without client-controlled exported_at', async
           aiGenerated: false,
           scheduledAt: null,
           exportedAt: '2026-05-31T12:00:00.000Z',
+          manualPostedAt: null,
           createdAt: '2026-05-31T00:00:00.000Z',
           updatedAt: '2026-05-31T12:00:00.000Z',
         },
@@ -545,6 +551,7 @@ test('client payload sends scheduled_at correctly', async () => {
           aiGenerated: false,
           scheduledAt: '2026-06-01T16:30:00.000Z',
           exportedAt: null,
+          manualPostedAt: null,
           createdAt: '2026-05-31T00:00:00.000Z',
           updatedAt: '2026-05-31T12:00:00.000Z',
         },
@@ -592,6 +599,7 @@ test('unschedule action sends the correct update payload', async () => {
           aiGenerated: false,
           scheduledAt: null,
           exportedAt: null,
+          manualPostedAt: null,
           createdAt: '2026-05-31T00:00:00.000Z',
           updatedAt: '2026-05-31T12:00:00.000Z',
         },
@@ -605,6 +613,92 @@ test('unschedule action sends the correct update payload', async () => {
 
     assert.equal(post.status, 'approved');
     assert.equal(post.scheduledAt, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('manual posted action sends server-controlled completion payload', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (input, init) => {
+    const body = JSON.parse(String(init?.body));
+
+    assert.equal(input, '/api/posts/post_1');
+    assert.equal(init?.method, 'PUT');
+    assert.deepEqual(body, { manual_posted: true });
+    assert.equal('manual_posted_at' in body, false);
+    assert.equal('manualPostedAt' in body, false);
+
+    return new Response(
+      JSON.stringify({
+        post: {
+          id: 'post_1',
+          businessId: 'business_1',
+          status: 'exported',
+          caption: 'Finished cedar privacy fence.',
+          hashtags: ['#FenceLife'],
+          platformSize: '1080x1080',
+          notes: null,
+          aiGenerated: false,
+          scheduledAt: '2026-05-31T16:00:00.000Z',
+          exportedAt: '2026-05-31T17:00:00.000Z',
+          manualPostedAt: '2026-05-31T17:00:00.000Z',
+          createdAt: '2026-05-31T00:00:00.000Z',
+          updatedAt: '2026-05-31T17:00:00.000Z',
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  };
+
+  try {
+    const post = await updatePost(async () => 'test-token', 'post_1', buildMarkPostedPayload());
+
+    assert.equal(post.status, 'exported');
+    assert.equal(post.manualPostedAt, '2026-05-31T17:00:00.000Z');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('undo posted action clears completion without a timestamp payload', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String(init?.body));
+
+    assert.deepEqual(body, { manual_posted: false });
+    assert.equal('manual_posted_at' in body, false);
+    assert.equal('manualPostedAt' in body, false);
+
+    return new Response(
+      JSON.stringify({
+        post: {
+          id: 'post_1',
+          businessId: 'business_1',
+          status: 'exported',
+          caption: 'Finished cedar privacy fence.',
+          hashtags: ['#FenceLife'],
+          platformSize: '1080x1080',
+          notes: null,
+          aiGenerated: false,
+          scheduledAt: '2026-05-31T16:00:00.000Z',
+          exportedAt: '2026-05-31T17:00:00.000Z',
+          manualPostedAt: null,
+          createdAt: '2026-05-31T00:00:00.000Z',
+          updatedAt: '2026-05-31T17:00:00.000Z',
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  };
+
+  try {
+    const post = await updatePost(async () => 'test-token', 'post_1', buildUndoPostedPayload());
+
+    assert.equal(post.status, 'exported');
+    assert.equal(post.manualPostedAt, null);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -718,6 +812,7 @@ const queuePosts = [
     status: 'exported',
     scheduledAt: '2026-05-29T16:00:00.000Z',
     exportedAt: '2026-06-01T16:00:00.000Z',
+    manualPostedAt: null,
   }),
 ];
 
@@ -730,6 +825,36 @@ test('calendar queue filters upcoming today past and exported posts', () => {
   assert.deepEqual(idsByFilter('past'), ['past']);
   assert.deepEqual(idsByFilter('upcoming'), ['today', 'upcoming']);
   assert.deepEqual(idsByFilter('exported'), ['exported']);
+});
+
+test('today queue keeps manually posted scheduled items visible as complete', () => {
+  const now = new Date('2026-05-31T18:00:00.000Z');
+  const postedToday = buildQueuePost({
+    id: 'posted_today',
+    status: 'exported',
+    scheduledAt: '2026-05-31T16:00:00.000Z',
+    exportedAt: '2026-05-31T17:00:00.000Z',
+    manualPostedAt: '2026-05-31T17:15:00.000Z',
+  });
+
+  assert.deepEqual(
+    filterCalendarQueuePosts([...queuePosts, postedToday], 'today', now).map((post) => post.id),
+    ['today', 'posted_today'],
+  );
+});
+
+test('exported queue sorts manually posted items by completion time', () => {
+  const posted = buildQueuePost({
+    id: 'posted',
+    status: 'exported',
+    exportedAt: '2026-05-31T17:00:00.000Z',
+    manualPostedAt: '2026-06-02T17:15:00.000Z',
+  });
+
+  assert.deepEqual(
+    filterCalendarQueuePosts([...queuePosts, posted], 'exported').map((post) => post.id),
+    ['exported', 'posted'],
+  );
 });
 
 test('calendar queue groups scheduled posts by date', () => {
@@ -784,6 +909,17 @@ test('calendar queue thumbnail prefers final edited media', () => {
   assert.equal(canQueuePostExport({ ...post, caption: '' }), false);
 });
 
+test('calendar queue recognizes manually posted completion state', () => {
+  const posted = buildQueuePost({
+    status: 'exported',
+    exportedAt: '2026-05-31T17:00:00.000Z',
+    manualPostedAt: '2026-05-31T17:15:00.000Z',
+  });
+
+  assert.equal(isQueuePostManuallyPosted(posted), true);
+  assert.equal(isQueuePostManuallyPosted({ ...posted, manualPostedAt: null }), false);
+});
+
 function buildQueuePost(overrides: Partial<PostSummary> = {}): PostSummary {
   return {
     id: 'post_1',
@@ -796,6 +932,7 @@ function buildQueuePost(overrides: Partial<PostSummary> = {}): PostSummary {
     aiGenerated: false,
     scheduledAt: '2026-05-31T16:00:00.000Z',
     exportedAt: null,
+    manualPostedAt: null,
     createdAt: '2026-05-31T00:00:00.000Z',
     updatedAt: '2026-05-31T12:00:00.000Z',
     mediaCount: 1,

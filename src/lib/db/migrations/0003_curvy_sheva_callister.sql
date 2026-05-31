@@ -1,0 +1,2 @@
+ALTER TABLE "posts" ADD COLUMN "manual_posted_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "idx_posts_business_manual_posted" ON "posts" USING btree ("business_id","manual_posted_at");
