@@ -8,7 +8,7 @@
 
 **Scope boundary:** This phase adds scheduling UI and a calendar/manual posting queue. It does NOT add direct social publishing or automated cron jobs. Users still export and manually post. Email reminders are optional Phase 3.5+ and should only be built after the core calendar/manual posting workflow is complete.
 
-**Current status:** Phase 3.1 scheduling foundation and Phase 3.2 manual posting queue are implemented and browser-tested in Vercel Preview. The current `/calendar` implementation is a simple queue/list view with `Upcoming`, `Today`, `Past`, and `Exported` tabs. A full drag-and-drop monthly calendar grid is not built yet.
+**Current status:** Phase 3.1 scheduling foundation, Phase 3.2 manual posting queue, and manual posted completion tracking are implemented and browser-tested in Vercel Preview. The current `/calendar` implementation is a simple queue/list view with `Upcoming`, `Today`, `Past`, and `Exported` tabs. A full drag-and-drop monthly calendar grid is not built yet.
 
 ---
 
@@ -46,6 +46,9 @@
 - Copy text copies caption + hashtags for manual posting
 - Unschedule is available for scheduled posts
 - Export/Re-export downloads the image, copies text, and preserves status rules
+- Mark Posted records manual completion for scheduled/exported posts
+- Posted manually state shows the persisted completion timestamp
+- Undo posted clears the completion timestamp while keeping exported status
 - Empty states link back to Posts to create or schedule content
 
 **Acceptance criteria:**
@@ -55,6 +58,11 @@
 - [x] Today's queue shows what needs to be posted
 - [x] Export/Re-export works from queue items
 - [x] Copy text and Unschedule actions work
+- [x] Mark Posted works for scheduled and exported queue items
+- [x] Scheduled posts marked posted become `exported` and receive `exportedAt` plus `manualPostedAt`
+- [x] Exported posts can be marked posted without changing status
+- [x] Undo posted clears `manualPostedAt` and keeps status `exported`
+- [x] Posted manually timestamp persists after refresh
 - [x] Responsive list view works on mobile-friendly layouts
 - [x] Quick Export in `/posts` still works
 - [ ] Full monthly grid navigation
@@ -87,8 +95,11 @@ Upcoming: next 5 scheduled posts with "Export" shortcut.
 - [x] Posts can be scheduled for future dates
 - [x] Manual posting queue displays scheduled posts
 - [x] Today's queue shows what is due with export/re-export actions
+- [x] Scheduled/exported posts can be marked manually posted
+- [x] Manual posted completion is tracked with nullable `manual_posted_at`
+- [x] Undo posted clears completion without adding a new status
 - [ ] Dashboard shows real stats
-- [x] Phase 3.1 and 3.2 features work in Vercel Preview
+- [x] Phase 3.1, 3.2, and manual posted completion features work in Vercel Preview
 - [x] **Social Studio is now a lean daily content management tool for manual posting**
 
 ---

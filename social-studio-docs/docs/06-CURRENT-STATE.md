@@ -82,13 +82,15 @@ Formal review path:
 
 ## Phase 3 Status
 
-Phase 3.1 scheduling foundation and Phase 3.2 manual posting queue are implemented and browser-tested in Vercel Preview.
+Phase 3.1 scheduling foundation, Phase 3.2 manual posting queue, and manual posted completion tracking are implemented and browser-tested in Vercel Preview.
 
 ### Implemented
 
 - `scheduled` post status.
 - Nullable `scheduled_at` / `scheduledAt` on posts.
+- Nullable `manual_posted_at` / `manualPostedAt` on posts.
 - Server-side schedule, unschedule, and scheduled-export status rules.
+- Server-controlled manual posted completion rules using `manual_posted`.
 - Scheduling controls in the existing Posts editor for approved posts.
 - `/calendar` manual posting queue.
 - Queue tabs for `Upcoming`, `Today`, `Past`, and `Exported`.
@@ -98,10 +100,13 @@ Phase 3.1 scheduling foundation and Phase 3.2 manual posting queue are implement
 - Copy text action for manual posting.
 - Unschedule action for scheduled posts.
 - Export/Re-export actions from the queue.
+- Mark Posted action for scheduled and exported queue items.
+- Posted manually completion state with persisted timestamp.
+- Undo posted action that clears `manualPostedAt` while keeping status `exported`.
 
 ### Preview Validation
 
-The Phase 3.2 workflow has been validated in Vercel Preview:
+The Phase 3 manual posting workflow has been validated in Vercel Preview:
 
 - Workspace loads.
 - Scheduled posts appear in the queue.
@@ -109,6 +114,11 @@ The Phase 3.2 workflow has been validated in Vercel Preview:
 - Queue items group by date.
 - Queue thumbnails, caption previews, time labels, status badges, and actions display correctly.
 - View/Edit Post, Copy text, Unschedule, Export, and Re-export work.
+- Mark Posted works for scheduled and exported queue items.
+- Scheduled posts marked posted become `exported` and receive server-owned `exportedAt` and `manualPostedAt`.
+- Exported posts can be marked posted without changing status.
+- Undo posted clears `manualPostedAt` and keeps status `exported`.
+- Posted manually timestamps persist after refresh.
 - Quick Export in `/posts` still works.
 - Exported state persists after refresh.
 
@@ -120,7 +130,9 @@ Manual posting queue path:
 2. Schedule approved posts for a future date and time.
 3. Review due content in `/calendar`.
 4. Copy text, export/download the image, and post manually.
-5. Re-export exported posts if needed without changing ownership or status rules.
+5. Mark the scheduled or exported item posted after manually posting.
+6. Undo posted if the completion marker was set by mistake.
+7. Re-export exported posts if needed without changing ownership or status rules.
 
 ## Not Yet Built
 

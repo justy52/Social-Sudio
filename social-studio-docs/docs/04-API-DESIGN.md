@@ -48,7 +48,7 @@ Update business details. Ownership check required.
 
 ## Phase 2 Routes
 
-Current implementation status: Phase 2 content APIs and Phase 3 scheduling/queue support are implemented and validated in Vercel Preview. Posts CRUD, media upload/delete, edited media upload, OpenAI caption generation, scheduling, manual export status updates, and the manual posting queue are working. Direct publishing is not built yet.
+Current implementation status: Phase 2 content APIs and Phase 3 scheduling/queue support are implemented and validated in Vercel Preview. Posts CRUD, media upload/delete, edited media upload, OpenAI caption generation, scheduling, manual export status updates, manual posted completion tracking, and the manual posting queue are working. Direct publishing is not built yet.
 
 ### `GET /api/posts?business_id=UUID`
 List posts owned by the authenticated user. Optional `business_id` filter must pass ownership verification.
@@ -60,7 +60,14 @@ Create a new draft post. Body includes `business_id`, `caption`, `hashtags`, `pl
 Fetch one owned post and linked `post_media` records. Ownership check required through the post's business.
 
 ### `PUT /api/posts/[id]`
-Update a post. Can update caption, hashtags, platform size, notes, AI-generated flag, scheduled time, and allowed status transitions. Ownership check required through the post's business. `exported_at` is server-controlled only.
+Update a post. Can update caption, hashtags, platform size, notes, AI-generated flag, scheduled time, allowed status transitions, and the server-controlled `manual_posted` action. Ownership check required through the post's business. `exported_at` and `manual_posted_at` are server-controlled only.
+
+Manual posted completion rules:
+- Clients send `manual_posted: true` or `manual_posted: false`; clients cannot set `manual_posted_at` directly.
+- Draft, review, and approved posts cannot be marked manually posted.
+- Scheduled posts marked posted become `exported` and receive server-owned `exportedAt` and `manualPostedAt`.
+- Exported posts marked posted receive `manualPostedAt` without changing status.
+- Undo posted clears `manualPostedAt` and keeps status `exported`.
 
 ### `DELETE /api/posts/[id]`
 Delete a post and cascade linked `post_media` database rows. Ownership check required. Blob object cleanup is deferred to the media upload pass.
@@ -129,7 +136,7 @@ Response:
 
 ## Phase 3 Routes
 
-No new API routes are required for the core Phase 3 calendar/manual posting workflow. The `/calendar` page uses the existing posts API and client-side grouping/filtering for Upcoming, Today, Past, and Exported queue tabs. Email reminders are optional Phase 3.5+ and should only be built after that core workflow is complete. If email reminders are implemented:
+No new API routes are required for the core Phase 3 calendar/manual posting workflow. The `/calendar` page uses the existing posts API and client-side grouping/filtering for Upcoming, Today, Past, and Exported queue tabs. Manual posted completion is handled through `PUT /api/posts/[id]` with the server-controlled `manual_posted` action and nullable `manual_posted_at` timestamp. Email reminders are optional Phase 3.5+ and should only be built after that core workflow is complete. If email reminders are implemented:
 
 ### `GET /api/reminders/cron`
 Daily cron: find posts scheduled for today, send reminder emails via Resend.
