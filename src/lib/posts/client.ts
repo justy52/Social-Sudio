@@ -27,6 +27,7 @@ export type PostRecord = {
   platformSize: string;
   notes: string | null;
   aiGenerated: boolean;
+  scheduledAt: string | null;
   exportedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -49,6 +50,7 @@ export type UpdatePostInput = {
   notes?: string;
   ai_generated?: boolean;
   status?: PostStatus;
+  scheduled_at?: string | null;
 };
 
 export type CaptionTone = 'professional' | 'casual' | 'funny' | 'inspirational';

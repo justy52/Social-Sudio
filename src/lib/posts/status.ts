@@ -1,11 +1,12 @@
-export const postStatuses = ['draft', 'ready_for_review', 'approved', 'exported'] as const;
+export const postStatuses = ['draft', 'ready_for_review', 'approved', 'scheduled', 'exported'] as const;
 
 export type PostStatus = (typeof postStatuses)[number];
 
 export const allowedPostStatusTransitions: Record<PostStatus, readonly PostStatus[]> = {
   draft: ['ready_for_review'],
   ready_for_review: ['approved', 'draft'],
-  approved: ['exported', 'draft'],
+  approved: ['scheduled', 'exported', 'draft'],
+  scheduled: ['approved', 'exported'],
   exported: [],
 };
 

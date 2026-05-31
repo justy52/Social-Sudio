@@ -8,6 +8,7 @@ export function canExportPost(status: PostRecord['status']) {
     status === 'draft' ||
     status === 'ready_for_review' ||
     status === 'approved' ||
+    status === 'scheduled' ||
     status === 'exported'
   );
 }
@@ -28,6 +29,10 @@ export function getQuickExportStatusSequence(status: PostRecord['status']): Post
   }
 
   if (status === 'approved') {
+    return ['exported'];
+  }
+
+  if (status === 'scheduled') {
     return ['exported'];
   }
 

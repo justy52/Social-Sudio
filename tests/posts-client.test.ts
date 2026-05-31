@@ -51,6 +51,7 @@ test('createDraftPost calls the posts API with the selected business id', async 
           platformSize: '1080x1080',
           notes: null,
           aiGenerated: false,
+          scheduledAt: null,
           exportedAt: null,
           createdAt: '2026-05-28T00:00:00.000Z',
           updatedAt: '2026-05-28T00:00:00.000Z',
@@ -143,6 +144,7 @@ const exportDetail: PostDetail = {
     platformSize: '1080x1080',
     notes: null,
     aiGenerated: false,
+    scheduledAt: null,
     exportedAt: null,
     createdAt: '2026-05-31T00:00:00.000Z',
     updatedAt: '2026-05-31T00:00:00.000Z',
@@ -249,10 +251,15 @@ test('quick export from ready for review ends exported', async () => {
 
 test('approved export transitions directly to exported and re-export keeps status unchanged', async () => {
   const approvedTransitions: string[] = [];
+  const scheduledTransitions: string[] = [];
   const exportedTransitions: string[] = [];
 
   const approvedResult = await applyQuickExportStatusTransitions('approved', async (status) => {
     approvedTransitions.push(status);
+    return { status };
+  });
+  const scheduledResult = await applyQuickExportStatusTransitions('scheduled', async (status) => {
+    scheduledTransitions.push(status);
     return { status };
   });
   const exportedResult = await applyQuickExportStatusTransitions('exported', async (status) => {
@@ -262,6 +269,8 @@ test('approved export transitions directly to exported and re-export keeps statu
 
   assert.deepEqual(approvedTransitions, ['exported']);
   assert.equal(approvedResult?.status, 'exported');
+  assert.deepEqual(scheduledTransitions, ['exported']);
+  assert.equal(scheduledResult?.status, 'exported');
   assert.deepEqual(exportedTransitions, []);
   assert.equal(exportedResult, null);
 });
@@ -479,6 +488,7 @@ test('export status update is sent without client-controlled exported_at', async
           platformSize: '1080x1080',
           notes: null,
           aiGenerated: false,
+          scheduledAt: null,
           exportedAt: '2026-05-31T12:00:00.000Z',
           createdAt: '2026-05-31T00:00:00.000Z',
           updatedAt: '2026-05-31T12:00:00.000Z',
@@ -493,6 +503,54 @@ test('export status update is sent without client-controlled exported_at', async
 
     assert.equal(post.status, 'exported');
     assert.equal(post.exportedAt, '2026-05-31T12:00:00.000Z');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('client payload sends scheduled_at correctly', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (input, init) => {
+    const body = JSON.parse(String(init?.body));
+
+    assert.equal(input, '/api/posts/post_1');
+    assert.equal(init?.method, 'PUT');
+    assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer test-token');
+    assert.deepEqual(body, {
+      status: 'scheduled',
+      scheduled_at: '2026-06-01T16:30:00.000Z',
+    });
+
+    return new Response(
+      JSON.stringify({
+        post: {
+          id: 'post_1',
+          businessId: 'business_1',
+          status: 'scheduled',
+          caption: 'Finished cedar privacy fence.',
+          hashtags: ['#FenceLife'],
+          platformSize: '1080x1080',
+          notes: null,
+          aiGenerated: false,
+          scheduledAt: '2026-06-01T16:30:00.000Z',
+          exportedAt: null,
+          createdAt: '2026-05-31T00:00:00.000Z',
+          updatedAt: '2026-05-31T12:00:00.000Z',
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  };
+
+  try {
+    const post = await updatePost(async () => 'test-token', 'post_1', {
+      status: 'scheduled',
+      scheduled_at: '2026-06-01T16:30:00.000Z',
+    });
+
+    assert.equal(post.status, 'scheduled');
+    assert.equal(post.scheduledAt, '2026-06-01T16:30:00.000Z');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -540,7 +598,13 @@ test('status options expose only valid next transitions for the edit form', () =
     'approved',
     'draft',
   ]);
-  assert.deepEqual(getAvailableStatusOptions('approved'), ['approved', 'exported', 'draft']);
+  assert.deepEqual(getAvailableStatusOptions('approved'), [
+    'approved',
+    'scheduled',
+    'exported',
+    'draft',
+  ]);
+  assert.deepEqual(getAvailableStatusOptions('scheduled'), ['scheduled', 'approved', 'exported']);
 });
 
 test('client upload validation rejects non-image files', () => {

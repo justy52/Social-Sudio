@@ -102,3 +102,85 @@ test('export transition sets exported_at server-side', () => {
   assert.equal(values.status, 'exported');
   assert.equal(values.exportedAt, now);
 });
+
+test('approved post can be scheduled with a future scheduled_at', () => {
+  const now = new Date('2026-05-28T00:00:00.000Z');
+  const scheduledAt = '2026-05-29T16:30:00.000Z';
+  const input = postUpdateSchema.parse({
+    status: 'scheduled',
+    scheduled_at: scheduledAt,
+  });
+  const values = buildUpdatePostValues('approved', input, now);
+
+  assert.equal(values.status, 'scheduled');
+  assert.deepEqual(values.scheduledAt, new Date(scheduledAt));
+  assert.equal(values.exportedAt, undefined);
+});
+
+test('approved to scheduled requires scheduled_at in the future', () => {
+  const now = new Date('2026-05-28T00:00:00.000Z');
+
+  assert.throws(
+    () => buildUpdatePostValues('approved', postUpdateSchema.parse({ status: 'scheduled' }), now),
+    /Choose a future date and time/,
+  );
+  assert.throws(
+    () =>
+      buildUpdatePostValues(
+        'approved',
+        postUpdateSchema.parse({
+          status: 'scheduled',
+          scheduled_at: '2026-05-27T16:30:00.000Z',
+        }),
+        now,
+      ),
+    /Choose a future date and time/,
+  );
+});
+
+test('draft to scheduled is rejected', () => {
+  const input = postUpdateSchema.parse({
+    status: 'scheduled',
+    scheduled_at: '2026-05-29T16:30:00.000Z',
+  });
+
+  assert.throws(
+    () => buildUpdatePostValues('draft', input, new Date('2026-05-28T00:00:00.000Z')),
+    /Invalid post status transition: draft -> scheduled/,
+  );
+});
+
+test('scheduled to approved clears scheduled_at', () => {
+  const input = postUpdateSchema.parse({ status: 'approved' });
+  const values = buildUpdatePostValues(
+    'scheduled',
+    input,
+    new Date('2026-05-28T00:00:00.000Z'),
+  );
+
+  assert.equal(values.status, 'approved');
+  assert.equal(values.scheduledAt, null);
+});
+
+test('scheduled post can be saved without rescheduling', () => {
+  const input = postUpdateSchema.parse({ caption: 'Updated scheduled caption', status: 'scheduled' });
+  const values = buildUpdatePostValues(
+    'scheduled',
+    input,
+    new Date('2026-05-28T00:00:00.000Z'),
+  );
+
+  assert.equal(values.caption, 'Updated scheduled caption');
+  assert.equal(values.status, undefined);
+  assert.equal(values.scheduledAt, undefined);
+});
+
+test('scheduled to exported sets exported_at server-side and keeps schedule context', () => {
+  const now = new Date('2026-05-28T00:00:00.000Z');
+  const input = postUpdateSchema.parse({ status: 'exported' });
+  const values = buildUpdatePostValues('scheduled', input, now);
+
+  assert.equal(values.status, 'exported');
+  assert.equal(values.exportedAt, now);
+  assert.equal(values.scheduledAt, undefined);
+});

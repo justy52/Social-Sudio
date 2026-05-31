@@ -29,6 +29,7 @@ const postTextField = z.string().trim().max(2200);
 const postNotesField = z.string().trim().max(1200);
 const postHashtagsField = z.array(z.string().trim().min(1).max(80)).max(30);
 const platformSizeField = z.string().trim().regex(/^\d{3,4}x\d{3,4}$/, 'Use WIDTHxHEIGHT format.');
+const isoDateStringField = z.string().datetime({ offset: true });
 
 export const postCreateSchema = z
   .object({
@@ -83,6 +84,7 @@ export const postUpdateSchema = z
     notes: postNotesField.optional(),
     ai_generated: z.boolean().optional(),
     status: z.enum(postStatuses).optional(),
+    scheduled_at: isoDateStringField.nullable().optional(),
   })
   .strict()
   .refine((input) => Object.values(input).some((value) => value !== undefined), {
@@ -96,6 +98,7 @@ export const postUpdateSchema = z
       notes?: string;
       aiGenerated?: boolean;
       status?: (typeof postStatuses)[number];
+      scheduledAt?: Date | null;
     } = {};
 
     if (input.caption !== undefined) output.caption = input.caption;
@@ -104,6 +107,9 @@ export const postUpdateSchema = z
     if (input.notes !== undefined) output.notes = input.notes;
     if (input.ai_generated !== undefined) output.aiGenerated = input.ai_generated;
     if (input.status !== undefined) output.status = input.status;
+    if (input.scheduled_at !== undefined) {
+      output.scheduledAt = input.scheduled_at === null ? null : new Date(input.scheduled_at);
+    }
 
     return output;
   });

@@ -15,6 +15,13 @@
       "when": 1779997648831,
       "tag": "0001_phase_2_posts_media",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780257895932,
+      "tag": "0002_familiar_veda",
+      "breakpoints": true
     }
   ]
 }

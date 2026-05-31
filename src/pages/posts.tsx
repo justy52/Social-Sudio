@@ -61,6 +61,7 @@ const statusLabels: Record<PostStatus, string> = {
   draft: 'Draft',
   ready_for_review: 'Ready for review',
   approved: 'Approved',
+  scheduled: 'Scheduled',
   exported: 'Exported',
 };
 
@@ -79,6 +80,8 @@ export function PostsPage() {
   const { activeBusiness } = useBusinessContext();
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [form, setForm] = useState<PostFormState>(emptyForm);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,6 +119,11 @@ export function PostsPage() {
       status: detail.post.status,
       aiGenerated: detail.post.aiGenerated,
     });
+    const scheduleParts = detail.post.scheduledAt
+      ? getLocalDateTimeParts(detail.post.scheduledAt)
+      : getDefaultScheduleParts();
+    setScheduleDate(scheduleParts.date);
+    setScheduleTime(scheduleParts.time);
   }, [detailQuery.data]);
 
   const createMutation = useMutation({
@@ -291,6 +299,68 @@ export function PostsPage() {
     },
   });
 
+  const scheduleMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedDetail) {
+        throw new Error('Select a post before scheduling.');
+      }
+
+      const scheduledAt = buildScheduledAtIso(scheduleDate, scheduleTime);
+
+      return updatePost(getToken, selectedDetail.post.id, {
+        caption: form.caption,
+        hashtags: parseHashtagsInput(form.hashtags),
+        platform_size: form.platformSize,
+        notes: form.notes,
+        ai_generated: form.aiGenerated,
+        status: 'scheduled',
+        scheduled_at: scheduledAt,
+      });
+    },
+    onSuccess: async () => {
+      setMessage('Post scheduled.');
+      setError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['post', selectedPostId] }),
+      ]);
+    },
+    onError: (mutationError) => {
+      setError(readError(mutationError, 'Could not schedule post.'));
+      setMessage(null);
+    },
+  });
+
+  const unscheduleMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedDetail) {
+        throw new Error('Select a post before unscheduling.');
+      }
+
+      return updatePost(getToken, selectedDetail.post.id, {
+        caption: form.caption,
+        hashtags: parseHashtagsInput(form.hashtags),
+        platform_size: form.platformSize,
+        notes: form.notes,
+        ai_generated: form.aiGenerated,
+        status: 'approved',
+        scheduled_at: null,
+      });
+    },
+    onSuccess: async () => {
+      setMessage('Post unscheduled.');
+      setError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['post', selectedPostId] }),
+      ]);
+    },
+    onError: (mutationError) => {
+      setError(readError(mutationError, 'Could not unschedule post.'));
+      setMessage(null);
+    },
+  });
+
   const selectedDetail = detailQuery.data;
   const statusOptions = useMemo(
     () => (selectedDetail ? getAvailableStatusOptions(selectedDetail.post.status) : []),
@@ -396,9 +466,18 @@ export function PostsPage() {
           isDeletingPost={deletePostMutation.isPending}
           isDeletingMedia={deleteMediaMutation.isPending}
           isExporting={exportMutation.isPending}
+          isScheduling={scheduleMutation.isPending}
+          isUnscheduling={unscheduleMutation.isPending}
+          scheduleDate={scheduleDate}
+          scheduleTime={scheduleTime}
+          businessTimezone={activeBusiness?.timezone}
           onChange={setForm}
+          onScheduleDateChange={setScheduleDate}
+          onScheduleTimeChange={setScheduleTime}
           onSave={() => updateMutation.mutate()}
           onExport={() => exportMutation.mutate()}
+          onSchedule={() => scheduleMutation.mutate()}
+          onUnschedule={() => unscheduleMutation.mutate()}
           onCopyText={async (label, text) => {
             try {
               await copyTextToClipboard(text);
@@ -490,9 +569,18 @@ function PostEditor({
   isDeletingPost,
   isDeletingMedia,
   isExporting,
+  isScheduling,
+  isUnscheduling,
+  scheduleDate,
+  scheduleTime,
+  businessTimezone,
   onChange,
+  onScheduleDateChange,
+  onScheduleTimeChange,
   onSave,
   onExport,
+  onSchedule,
+  onUnschedule,
   onCopyText,
   onUpload,
   onDeleteMedia,
@@ -511,9 +599,18 @@ function PostEditor({
   isDeletingPost: boolean;
   isDeletingMedia: boolean;
   isExporting: boolean;
+  isScheduling: boolean;
+  isUnscheduling: boolean;
+  scheduleDate: string;
+  scheduleTime: string;
+  businessTimezone: string | undefined;
   onChange: (form: PostFormState) => void;
+  onScheduleDateChange: (value: string) => void;
+  onScheduleTimeChange: (value: string) => void;
   onSave: () => void;
   onExport: () => void;
+  onSchedule: () => void;
+  onUnschedule: () => void;
   onCopyText: (label: string, text: string) => Promise<void> | void;
   onUpload: (files: File[]) => void;
   onDeleteMedia: (media: PostMediaRecord) => void;
@@ -554,6 +651,9 @@ function PostEditor({
   });
   const isExportable = canExportPost(detail.post.status);
   const isQuickExport = detail.post.status === 'draft' || detail.post.status === 'ready_for_review';
+  const statusSelectOptions = statusOptions.filter(
+    (status) => status !== 'scheduled' || detail.post.status === 'scheduled',
+  );
 
   return (
     <Card>
@@ -588,7 +688,7 @@ function PostEditor({
               value={form.status}
               onChange={(event) => onChange({ ...form, status: event.target.value as PostStatus })}
             >
-              {statusOptions.map((status) => (
+              {statusSelectOptions.map((status) => (
                 <option key={status} value={status}>
                   {statusLabels[status]}
                 </option>
@@ -701,7 +801,7 @@ function PostEditor({
               ? isExporting
                 ? 'Re-exporting'
                 : 'Re-export'
-              : detail.post.status === 'approved'
+              : detail.post.status === 'approved' || detail.post.status === 'scheduled'
                 ? isExporting
                   ? 'Exporting'
                   : 'Export'
@@ -715,6 +815,66 @@ function PostEditor({
           <p className="text-sm text-muted-foreground">
             Quick export skips the manual review steps for solo workflows.
           </p>
+        )}
+
+        {detail.post.status === 'approved' && (
+          <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4">
+            <div>
+              <h3 className="text-sm font-semibold">Schedule for Later</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Times are shown in {businessTimezone ?? 'the business timezone'}.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_auto] sm:items-end">
+              <div className="space-y-2">
+                <Label htmlFor="schedule-date">Date</Label>
+                <Input
+                  id="schedule-date"
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(event) => onScheduleDateChange(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="schedule-time">Time</Label>
+                <Select
+                  id="schedule-time"
+                  value={scheduleTime}
+                  onChange={(event) => onScheduleTimeChange(event.target.value)}
+                >
+                  {scheduleTimeOptions.map((time) => (
+                    <option key={time} value={time}>
+                      {formatTimeOption(time)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button type="button" onClick={onSchedule} disabled={isScheduling}>
+                {isScheduling ? 'Scheduling' : 'Schedule'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {detail.post.status === 'scheduled' && (
+          <div className="space-y-3 rounded-md border border-primary/20 bg-primary/10 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-primary">Scheduled post</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {detail.post.scheduledAt
+                  ? `Scheduled for ${formatDateTime(detail.post.scheduledAt, businessTimezone)}`
+                  : 'Scheduled time unavailable'}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onUnschedule}
+              disabled={isUnscheduling}
+            >
+              {isUnscheduling ? 'Unscheduling' : 'Unschedule'}
+            </Button>
+          </div>
         )}
 
         {detail.post.status === 'exported' && (
@@ -829,14 +989,75 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function formatDateTime(value: string) {
+function formatDateTime(value: string, timeZone?: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone,
+    timeZoneName: timeZone ? 'short' : undefined,
   }).format(new Date(value));
+}
+
+const scheduleTimeOptions = Array.from({ length: 48 }, (_item, index) => {
+  const hours = Math.floor(index / 2);
+  const minutes = index % 2 === 0 ? '00' : '30';
+  return `${String(hours).padStart(2, '0')}:${minutes}`;
+});
+
+function formatTimeOption(value: string) {
+  const [hours = '0', minutes = '00'] = value.split(':');
+  const date = new Date();
+  date.setHours(Number(hours), Number(minutes), 0, 0);
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function getLocalDateTimeParts(value: string) {
+  const date = new Date(value);
+
+  return {
+    date: formatInputDate(date),
+    time: `${String(date.getHours()).padStart(2, '0')}:${date.getMinutes() < 30 ? '00' : '30'}`,
+  };
+}
+
+function getDefaultScheduleParts() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() + 60);
+  date.setMinutes(date.getMinutes() <= 30 ? 30 : 60, 0, 0);
+
+  return {
+    date: formatInputDate(date),
+    time: `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
+  };
+}
+
+function formatInputDate(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function buildScheduledAtIso(dateValue: string, timeValue: string) {
+  if (!dateValue || !timeValue) {
+    throw new Error('Choose a future date and time.');
+  }
+
+  const scheduledAt = new Date(`${dateValue}T${timeValue}:00`);
+
+  if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) {
+    throw new Error('Choose a future date and time.');
+  }
+
+  return scheduledAt.toISOString();
 }
 
 function readError(error: unknown, fallback: string) {

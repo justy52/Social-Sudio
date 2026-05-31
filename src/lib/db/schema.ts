@@ -57,6 +57,7 @@ export const posts = pgTable(
     platformSize: text('platform_size').default('1080x1080').notNull(),
     notes: text('notes'),
     aiGenerated: boolean('ai_generated').default(false).notNull(),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     exportedAt: timestamp('exported_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -65,6 +66,7 @@ export const posts = pgTable(
     businessIdx: index('idx_posts_business').on(table.businessId),
     statusIdx: index('idx_posts_status').on(table.status),
     businessStatusIdx: index('idx_posts_business_status').on(table.businessId, table.status),
+    businessScheduledIdx: index('idx_posts_business_scheduled').on(table.businessId, table.scheduledAt),
   }),
 );
 

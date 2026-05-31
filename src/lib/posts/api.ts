@@ -72,6 +72,7 @@ export function buildUpdatePostValues(
     notes?: string;
     aiGenerated?: boolean;
     status?: PostStatus;
+    scheduledAt?: Date | null;
     exportedAt?: Date;
     updatedAt: Date;
   } = {
@@ -96,13 +97,52 @@ export function buildUpdatePostValues(
       );
     }
 
+    if (input.status === 'scheduled' && currentStatusValue !== 'scheduled') {
+      if (currentStatusValue !== 'approved') {
+        throw new ApiError(400, 'Only approved posts can be scheduled.');
+      }
+
+      if (!input.scheduledAt) {
+        throw new ApiError(400, 'Choose a future date and time.');
+      }
+
+      if (input.scheduledAt <= now) {
+        throw new ApiError(400, 'Choose a future date and time.');
+      }
+    }
+
     if (input.status !== currentStatusValue) {
       values.status = input.status;
 
       if (input.status === 'exported') {
         values.exportedAt = now;
       }
+
+      if (currentStatusValue === 'scheduled' && input.status === 'approved') {
+        values.scheduledAt = null;
+      }
     }
+  }
+
+  if (input.scheduledAt !== undefined) {
+    if (
+      input.scheduledAt === null &&
+      currentStatusValue === 'scheduled' &&
+      input.status === 'approved'
+    ) {
+      values.scheduledAt = null;
+      return values;
+    }
+
+    if (input.status !== 'scheduled') {
+      throw new ApiError(400, 'Choose a future date and time.');
+    }
+
+    if (input.scheduledAt !== null && input.scheduledAt <= now) {
+      throw new ApiError(400, 'Choose a future date and time.');
+    }
+
+    values.scheduledAt = input.scheduledAt;
   }
 
   return values;
