@@ -6,7 +6,7 @@ import {
   buildCaptionPrompt,
   generateCaption,
   normalizeCaptionOutput,
-  requireAnthropicApiKey,
+  requireOpenAIApiKey,
 } from '../src/lib/ai/captions.ts';
 import { captionGenerateSchema } from '../src/lib/validation.ts';
 
@@ -127,12 +127,18 @@ test('caption normalization strips hashtags when they are disabled', () => {
   });
 });
 
-test('missing Anthropic API key returns a clear server-side error', () => {
-  assert.throws(() => requireAnthropicApiKey(undefined), /ANTHROPIC_API_KEY/);
+test('missing OpenAI API key returns a clear server-side error', () => {
+  assert.throws(() => requireOpenAIApiKey(undefined), /OPENAI_API_KEY/);
 });
 
-test('generateCaption normalizes Claude responses without exposing the API key', async () => {
+test('generateCaption normalizes OpenAI responses without exposing the API key', async () => {
   const seenHeaders: Record<string, string> = {};
+  let requestBody: {
+    model?: string;
+    instructions?: string;
+    input?: string;
+    max_output_tokens?: number;
+  } = {};
   const result = await generateCaption(
     business,
     captionGenerateSchema.parse({
@@ -145,13 +151,53 @@ test('generateCaption normalizes Claude responses without exposing the API key',
       apiKey: 'server-only-key',
       async fetchImpl(_url, init) {
         Object.assign(seenHeaders, init?.headers);
+        requestBody = JSON.parse(String(init?.body));
 
         return new Response(
           JSON.stringify({
-            content: [
+            output_text:
+              '{"caption":"Built clean and ready for the season.","hashtags":["#FenceLife"],"alternatives":["A clean cedar upgrade.","Privacy with polished curb appeal."]}',
+          }),
+          { status: 200 },
+        );
+      },
+    },
+  );
+
+  assert.equal(seenHeaders.Authorization, 'Bearer server-only-key');
+  assert.equal(seenHeaders['x-api-key'], undefined);
+  assert.equal(requestBody.model, 'gpt-5.4-mini');
+  assert.match(requestBody.instructions ?? '', /Aloha Fence/);
+  assert.match(requestBody.input ?? '', /New cedar fence installation in Heber City/);
+  assert.equal(JSON.stringify(requestBody).includes('server-only-key'), false);
+  assert.equal(result.caption, 'Built clean and ready for the season.');
+  assert.deepEqual(result.hashtags, ['#FenceLife']);
+  assert.equal(JSON.stringify(result).includes('server-only-key'), false);
+});
+
+test('generateCaption reads nested OpenAI output text content', async () => {
+  const result = await generateCaption(
+    business,
+    captionGenerateSchema.parse({
+      business_id: '11111111-1111-4111-8111-111111111111',
+      prompt_context: 'New cedar fence installation in Heber City',
+      tone: 'professional',
+      include_hashtags: true,
+    }),
+    {
+      apiKey: 'server-only-key',
+      async fetchImpl() {
+        return new Response(
+          JSON.stringify({
+            output: [
               {
-                type: 'text',
-                text: '{"caption":"Built clean and ready for the season.","hashtags":["#FenceLife"],"alternatives":["A clean cedar upgrade.","Privacy with polished curb appeal."]}',
+                type: 'message',
+                content: [
+                  {
+                    type: 'output_text',
+                    text: '{"caption":"A polished cedar upgrade.","hashtags":["#FenceLife"],"alternatives":["Fresh privacy for the season.","Clean lines, sturdy build."]}',
+                  },
+                ],
               },
             ],
           }),
@@ -161,13 +207,11 @@ test('generateCaption normalizes Claude responses without exposing the API key',
     },
   );
 
-  assert.equal(seenHeaders['x-api-key'], 'server-only-key');
-  assert.equal(result.caption, 'Built clean and ready for the season.');
-  assert.deepEqual(result.hashtags, ['#FenceLife']);
-  assert.equal(JSON.stringify(result).includes('server-only-key'), false);
+  assert.equal(result.caption, 'A polished cedar upgrade.');
+  assert.deepEqual(result.alternatives, ['Fresh privacy for the season.', 'Clean lines, sturdy build.']);
 });
 
-test('generateCaption turns Claude failures into a graceful API error', async () => {
+test('generateCaption turns OpenAI failures into a graceful API error', async () => {
   await assert.rejects(
     () =>
       generateCaption(

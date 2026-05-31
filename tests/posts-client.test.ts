@@ -70,7 +70,7 @@ test('generateCaption posts the expected authed request shape', async () => {
       image_description: 'A finished cedar fence beside a mountain home',
     });
     assert.equal('api_key' in body, false);
-    assert.equal('ANTHROPIC_API_KEY' in body, false);
+    assert.equal('OPENAI_API_KEY' in body, false);
 
     return new Response(
       JSON.stringify({

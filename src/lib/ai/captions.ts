@@ -17,13 +17,19 @@ export interface CaptionPrompt {
 
 type CaptionBusiness = Pick<Business, 'name' | 'industry' | 'brandVoice' | 'userId'>;
 
-interface AnthropicTextBlock {
-  type: 'text';
+interface OpenAIResponseOutputText {
+  type: 'output_text';
   text: string;
 }
 
-interface AnthropicResponse {
-  content?: AnthropicTextBlock[];
+interface OpenAIResponseMessage {
+  type: 'message';
+  content?: OpenAIResponseOutputText[];
+}
+
+interface OpenAIResponse {
+  output_text?: string;
+  output?: OpenAIResponseMessage[];
 }
 
 interface GenerateCaptionOptions {
@@ -31,7 +37,7 @@ interface GenerateCaptionOptions {
   fetchImpl?: typeof fetch;
 }
 
-const claudeModel = 'claude-sonnet-4-20250514';
+const openAiCaptionModel = 'gpt-5.4-mini';
 
 export function assertOwnedBusinessForCaptions(
   business: Pick<Business, 'userId'> | null | undefined,
@@ -71,9 +77,9 @@ export function buildCaptionPrompt(
   };
 }
 
-export function requireAnthropicApiKey(apiKey: string | undefined) {
+export function requireOpenAIApiKey(apiKey: string | undefined) {
   if (!apiKey) {
-    throw new ApiError(500, 'ANTHROPIC_API_KEY is not configured');
+    throw new ApiError(500, 'OPENAI_API_KEY is not configured');
   }
 
   return apiKey;
@@ -84,25 +90,24 @@ export async function generateCaption(
   input: CaptionGenerateInput,
   options: GenerateCaptionOptions = {},
 ): Promise<CaptionGenerationResult> {
-  const apiKey = requireAnthropicApiKey(options.apiKey ?? process.env.ANTHROPIC_API_KEY);
+  const apiKey = requireOpenAIApiKey(options.apiKey ?? process.env.OPENAI_API_KEY);
   const fetchImpl = options.fetchImpl ?? fetch;
   const prompt = buildCaptionPrompt(business, input);
 
   let response: Response;
 
   try {
-    response = await fetchImpl('https://api.anthropic.com/v1/messages', {
+    response = await fetchImpl('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
-        'x-api-key': apiKey,
       },
       body: JSON.stringify({
-        model: claudeModel,
-        max_tokens: 1000,
-        system: prompt.system,
-        messages: [{ role: 'user', content: prompt.user }],
+        model: openAiCaptionModel,
+        instructions: prompt.system,
+        input: prompt.user,
+        max_output_tokens: 1000,
       }),
     });
   } catch {
@@ -113,18 +118,26 @@ export async function generateCaption(
     throw new ApiError(502, 'Caption generation failed. Please try again.');
   }
 
-  const data = (await response.json()) as AnthropicResponse;
-  const text = data.content
-    ?.filter((block): block is AnthropicTextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n')
-    .trim();
+  const data = (await response.json()) as OpenAIResponse;
+  const text = extractOpenAIResponseText(data);
 
   if (!text) {
     throw new ApiError(502, 'Caption generation returned an empty response.');
   }
 
   return normalizeCaptionOutput(text, input.includeHashtags);
+}
+
+function extractOpenAIResponseText(data: OpenAIResponse) {
+  const text =
+    data.output_text ??
+    data.output
+      ?.flatMap((item) => item.content ?? [])
+      .filter((block): block is OpenAIResponseOutputText => block.type === 'output_text')
+      .map((block) => block.text)
+      .join('\n');
+
+  return text?.trim();
 }
 
 export function normalizeCaptionOutput(rawText: string, includeHashtags: boolean): CaptionGenerationResult {
