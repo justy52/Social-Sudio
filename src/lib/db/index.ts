@@ -1,6 +1,9 @@
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
+import { loadServerEnv } from '../server-env';
 import * as schema from './schema';
+
+loadServerEnv();
 
 const databaseUrl = process.env.DATABASE_URL;
 

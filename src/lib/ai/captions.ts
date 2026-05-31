@@ -1,6 +1,9 @@
 import { ApiError } from '../api-helpers.ts';
 import type { Business } from '../db/schema.ts';
+import { loadServerEnv } from '../server-env.ts';
 import type { CaptionGenerateInput } from '../validation.ts';
+
+loadServerEnv();
 
 export type CaptionTone = CaptionGenerateInput['tone'];
 

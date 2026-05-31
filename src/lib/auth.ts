@@ -4,6 +4,9 @@ import { and, eq } from 'drizzle-orm';
 import { ApiError } from './api-helpers';
 import { db } from './db';
 import { businesses, postMedia, posts, users } from './db/schema';
+import { loadServerEnv } from './server-env';
+
+loadServerEnv();
 
 function readHeader(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -23,6 +26,7 @@ export async function requireAuth(req: VercelRequest) {
   const token = getBearerToken(req);
 
   if (!token) {
+    logLocalAuthDiagnostics(req, 'missing_token');
     throw new ApiError(401, 'Unauthorized');
   }
 
@@ -32,17 +36,85 @@ export async function requireAuth(req: VercelRequest) {
     });
 
     if (!payload.sub) {
+      logLocalAuthDiagnostics(req, 'missing_subject');
       throw new ApiError(401, 'Unauthorized');
     }
 
+    logLocalAuthDiagnostics(req, 'verified');
     return { userId: payload.sub };
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
     }
 
+    logLocalAuthDiagnostics(req, 'verification_failed', error);
     throw new ApiError(401, 'Unauthorized');
   }
+}
+
+function logLocalAuthDiagnostics(
+  req: VercelRequest,
+  outcome: 'missing_token' | 'missing_subject' | 'verified' | 'verification_failed',
+  error?: unknown,
+) {
+  if (process.env.NODE_ENV === 'production') {
+    return;
+  }
+
+  const header = readHeader(req.headers.authorization);
+  console.warn('[auth:local]', {
+    path: req.url,
+    authHeaderPresent: Boolean(header),
+    bearerTokenPresent: Boolean(getBearerToken(req)),
+    clerkSecretPresent: Boolean(process.env.CLERK_SECRET_KEY),
+    clerkSecretKind: getClerkSecretKind(process.env.CLERK_SECRET_KEY),
+    outcome,
+    errorCategory: error ? getAuthErrorCategory(error) : null,
+  });
+}
+
+function getClerkSecretKind(secretKey: string | undefined) {
+  if (!secretKey) {
+    return 'missing';
+  }
+
+  if (secretKey.startsWith('sk_test_')) {
+    return 'test';
+  }
+
+  if (secretKey.startsWith('sk_live_')) {
+    return 'live';
+  }
+
+  return 'unknown';
+}
+
+function getAuthErrorCategory(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return 'unknown';
+  }
+
+  const value = error as { message?: unknown; status?: unknown; statusCode?: unknown };
+  const status = typeof value.status === 'number' ? value.status : value.statusCode;
+  const message = typeof value.message === 'string' ? value.message.toLowerCase() : '';
+
+  if (status === 401 || message.includes('unauthorized')) {
+    return 'unauthorized';
+  }
+
+  if (message.includes('expired')) {
+    return 'expired';
+  }
+
+  if (message.includes('issuer') || message.includes('signature') || message.includes('jwt')) {
+    return 'invalid_token';
+  }
+
+  if (message.includes('secret')) {
+    return 'missing_or_invalid_secret';
+  }
+
+  return 'verification_error';
 }
 
 export async function syncCurrentUserFromClerk(userId: string) {

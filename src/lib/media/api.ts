@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { ApiError } from '../api-helpers.ts';
+import { loadServerEnv } from '../server-env.ts';
+
+loadServerEnv();
 
 export const maxImageUploadBytes = 10 * 1024 * 1024;
 export const allowedImageMimeTypes = ['image/jpeg', 'image/png', 'image/webp'] as const;
