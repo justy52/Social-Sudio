@@ -7,10 +7,16 @@ export const vercelBlobStorage: BlobStorageAdapter = {
       access: 'public',
       addRandomSuffix: false,
       contentType: options.contentType,
-      token: options.token,
+      ...(options.token ? { token: options.token } : {}),
+      ...(!options.token && options.oidcToken ? { oidcToken: options.oidcToken } : {}),
+      ...(!options.token && options.storeId ? { storeId: options.storeId } : {}),
     });
   },
   del(pathname, options) {
-    return del(pathname, { token: options.token });
+    return del(pathname, {
+      ...(options.token ? { token: options.token } : {}),
+      ...(!options.token && options.oidcToken ? { oidcToken: options.oidcToken } : {}),
+      ...(!options.token && options.storeId ? { storeId: options.storeId } : {}),
+    });
   },
 };

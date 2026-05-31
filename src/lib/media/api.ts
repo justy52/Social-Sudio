@@ -40,9 +40,15 @@ export type BlobStorageAdapter = {
   put: (
     pathname: string,
     body: Buffer,
-    options: { contentType: string; token: string },
+    options: BlobStorageAuth & { contentType: string },
   ) => Promise<BlobPutResult>;
-  del: (pathname: string, options: { token: string }) => Promise<void>;
+  del: (pathname: string, options: BlobStorageAuth) => Promise<void>;
+};
+
+export type BlobStorageAuth = {
+  token?: string;
+  oidcToken?: string;
+  storeId?: string;
 };
 
 export type CreateMediaRecordInput = {
@@ -56,12 +62,36 @@ export type CreateMediaRecordInput = {
   originalUrl: string | null;
 };
 
-export function requireBlobReadWriteToken(token: string | undefined) {
-  if (!token) {
+export type BlobStorageAuthStatus = BlobStorageAuth & {
+  hasReadWriteToken: boolean;
+  hasOidcToken: boolean;
+  hasBlobStoreId: boolean;
+  hasUsableCredentials: boolean;
+};
+
+export function getBlobStorageAuth(env: NodeJS.ProcessEnv = process.env): BlobStorageAuthStatus {
+  const token = env.BLOB_READ_WRITE_TOKEN?.trim() || undefined;
+  const oidcToken = env.VERCEL_OIDC_TOKEN?.trim() || undefined;
+  const storeId = env.BLOB_STORE_ID?.trim() || undefined;
+  const hasOidcCredentials = Boolean(oidcToken && storeId);
+
+  return {
+    token: hasOidcCredentials ? undefined : token,
+    oidcToken,
+    storeId,
+    hasReadWriteToken: Boolean(token),
+    hasOidcToken: Boolean(oidcToken),
+    hasBlobStoreId: Boolean(storeId),
+    hasUsableCredentials: Boolean(token || hasOidcCredentials),
+  };
+}
+
+export function requireBlobStorageAuth(auth: BlobStorageAuthStatus) {
+  if (!auth.hasUsableCredentials) {
     throw new ApiError(500, 'Blob storage is not configured.');
   }
 
-  return token;
+  return auth;
 }
 
 export function assertMediaUploadAuthenticated(userId: string | null | undefined) {
@@ -137,7 +167,12 @@ export async function uploadPostMedia<TMedia>(input: {
   width?: number;
   height?: number;
 }) {
-  const token = requireBlobReadWriteToken(input.token);
+  const auth = requireBlobStorageAuth(
+    getBlobStorageAuth({
+      ...process.env,
+      BLOB_READ_WRITE_TOKEN: input.token ?? process.env.BLOB_READ_WRITE_TOKEN,
+    }),
+  );
   assertValidImageUpload(input.file);
 
   const file = input.file;
@@ -162,12 +197,16 @@ export async function uploadPostMedia<TMedia>(input: {
       mimeType: file.mimeType,
       size: file.size,
       postIdPresent: Boolean(input.postId),
-      hasBlobToken: Boolean(input.token),
+      hasBlobToken: auth.hasReadWriteToken,
+      hasOidcToken: auth.hasOidcToken,
+      hasBlobStoreId: auth.hasBlobStoreId,
     });
 
     blob = await input.storage.put(blobKey, file.buffer, {
       contentType: file.mimeType,
-      token,
+      token: auth.token,
+      oidcToken: auth.token ? undefined : auth.oidcToken,
+      storeId: auth.token ? undefined : auth.storeId,
     });
   } catch (error) {
     const safeBlobError = readSafeBlobError(error);
@@ -177,7 +216,9 @@ export async function uploadPostMedia<TMedia>(input: {
       mimeType: file.mimeType,
       size: file.size,
       postIdPresent: Boolean(input.postId),
-      hasBlobToken: Boolean(input.token),
+      hasBlobToken: auth.hasReadWriteToken,
+      hasOidcToken: auth.hasOidcToken,
+      hasBlobStoreId: auth.hasBlobStoreId,
       blobError: safeBlobError,
     });
     throw new ApiError(502, buildBlobUploadErrorMessage(safeBlobError));
@@ -204,6 +245,8 @@ export function logMediaUploadDiagnostics(
     size?: number;
     postIdPresent?: boolean;
     hasBlobToken: boolean;
+    hasOidcToken?: boolean;
+    hasBlobStoreId?: boolean;
     blobError?: SafeBlobError;
   },
 ) {
@@ -253,11 +296,15 @@ export function buildBlobUploadErrorMessage(error: SafeBlobError) {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes('no read-write token') || lowerMessage.includes('no blob credentials')) {
-    return 'Blob upload failed: missing token.';
+    return 'Blob upload failed: missing Blob credentials.';
   }
 
   if (lowerMessage.includes('cannot use public access on a private store')) {
     return 'Blob upload failed: this Blob store is private, but Social Studio needs public Blob storage for image previews.';
+  }
+
+  if (lowerMessage.includes('this store does not exist') || lowerMessage.includes('store not found')) {
+    return 'Blob upload failed: Blob store was not found. Check BLOB_STORE_ID and the Vercel Blob project connection.';
   }
 
   if (
@@ -282,14 +329,23 @@ export async function deletePostMedia(input: {
   storage: BlobStorageAdapter;
   deleteMediaRecord: (mediaId: string) => Promise<void>;
 }) {
-  const token = requireBlobReadWriteToken(input.token);
+  const auth = requireBlobStorageAuth(
+    getBlobStorageAuth({
+      ...process.env,
+      BLOB_READ_WRITE_TOKEN: input.token ?? process.env.BLOB_READ_WRITE_TOKEN,
+    }),
+  );
 
   if (!input.media) {
     throw new ApiError(404, 'Media not found');
   }
 
   try {
-    await input.storage.del(input.media.blobKey, { token });
+    await input.storage.del(input.media.blobKey, {
+      token: auth.token,
+      oidcToken: auth.token ? undefined : auth.oidcToken,
+      storeId: auth.token ? undefined : auth.storeId,
+    });
   } catch {
     throw new ApiError(502, 'Media delete failed. Please try again.');
   }

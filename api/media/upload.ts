@@ -29,6 +29,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       size: form.files.file?.size,
       postIdPresent: Boolean(form.fields.post_id),
       hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+      hasOidcToken: Boolean(process.env.VERCEL_OIDC_TOKEN),
+      hasBlobStoreId: Boolean(process.env.BLOB_STORE_ID),
     });
     const { userId, post, business } = await requirePostOwnership(req, postId);
 

@@ -5,19 +5,31 @@ config({ path: '.env.local', override: false, quiet: true });
 config({ path: '.env', override: false, quiet: true });
 
 const token = process.env.BLOB_READ_WRITE_TOKEN;
+const oidcToken = process.env.VERCEL_OIDC_TOKEN;
+const storeId = process.env.BLOB_STORE_ID;
 const pathname = `diagnostics/social-studio-${Date.now()}.txt`;
+const hasOidcCredentials = Boolean(oidcToken && storeId);
+const hasUsableCredentials = Boolean(token || hasOidcCredentials);
 
-console.log(JSON.stringify({ blobTokenPresent: Boolean(token) }));
+console.log(
+  JSON.stringify({
+    blobReadWriteTokenPresent: Boolean(token),
+    vercelOidcTokenPresent: Boolean(oidcToken),
+    blobStoreIdPresent: Boolean(storeId),
+  }),
+);
 
-if (!token) {
+if (!hasUsableCredentials) {
   process.exitCode = 1;
-  console.log(JSON.stringify({ uploadOk: false, errorMessage: 'Blob token is missing.' }));
+  console.log(JSON.stringify({ uploadOk: false, errorMessage: 'Blob storage is not configured.' }));
 } else {
   try {
     const blob = await put(pathname, Buffer.from('ok'), {
       access: 'public',
       contentType: 'text/plain',
-      token,
+      ...(!hasOidcCredentials && token ? { token } : {}),
+      ...(hasOidcCredentials && oidcToken ? { oidcToken } : {}),
+      ...(hasOidcCredentials && storeId ? { storeId } : {}),
     });
 
     console.log(
@@ -28,7 +40,11 @@ if (!token) {
       }),
     );
 
-    await del(blob.pathname ?? pathname, { token });
+    await del(blob.pathname ?? pathname, {
+      ...(!hasOidcCredentials && token ? { token } : {}),
+      ...(hasOidcCredentials && oidcToken ? { oidcToken } : {}),
+      ...(hasOidcCredentials && storeId ? { storeId } : {}),
+    });
     console.log(JSON.stringify({ deleteOk: true }));
   } catch (error) {
     const safeError = readSafeError(error);

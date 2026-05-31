@@ -8,9 +8,10 @@ import {
   assertValidImageUpload,
   buildBlobUploadErrorMessage,
   deletePostMedia,
+  getBlobStorageAuth,
   maxImageUploadBytes,
   readSafeBlobError,
-  requireBlobReadWriteToken,
+  requireBlobStorageAuth,
   sanitizeFileName,
   uploadPostMedia,
   type BlobStorageAdapter,
@@ -38,6 +39,42 @@ function storageMock(overrides: Partial<BlobStorageAdapter> = {}): BlobStorageAd
     async del() {},
     ...overrides,
   };
+}
+
+async function withBlobEnv<T>(
+  env: {
+    BLOB_READ_WRITE_TOKEN?: string;
+    VERCEL_OIDC_TOKEN?: string;
+    BLOB_STORE_ID?: string;
+  },
+  fn: () => T | Promise<T>,
+) {
+  const previous = {
+    BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
+    VERCEL_OIDC_TOKEN: process.env.VERCEL_OIDC_TOKEN,
+    BLOB_STORE_ID: process.env.BLOB_STORE_ID,
+  };
+
+  setOptionalEnv('BLOB_READ_WRITE_TOKEN', env.BLOB_READ_WRITE_TOKEN);
+  setOptionalEnv('VERCEL_OIDC_TOKEN', env.VERCEL_OIDC_TOKEN);
+  setOptionalEnv('BLOB_STORE_ID', env.BLOB_STORE_ID);
+
+  try {
+    return await fn();
+  } finally {
+    setOptionalEnv('BLOB_READ_WRITE_TOKEN', previous.BLOB_READ_WRITE_TOKEN);
+    setOptionalEnv('VERCEL_OIDC_TOKEN', previous.VERCEL_OIDC_TOKEN);
+    setOptionalEnv('BLOB_STORE_ID', previous.BLOB_STORE_ID);
+  }
+}
+
+function setOptionalEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
 }
 
 test('upload requires auth', () => {
@@ -94,6 +131,9 @@ test('upload creates post_media only after storage success', async () => {
       async put(pathname, _body, options) {
         calls.push('blob');
         assert.equal(options.contentType, 'image/png');
+        assert.equal(options.token, 'blob-token');
+        assert.equal(options.oidcToken, undefined);
+        assert.equal(options.storeId, undefined);
         assert.equal(pathname, 'businesses/business_1/posts/post_1/media-file-id-launch-photo.png');
         return { url: `https://blob.example/${pathname}`, pathname };
       },
@@ -110,6 +150,80 @@ test('upload creates post_media only after storage success', async () => {
 
   assert.deepEqual(calls, ['blob', 'db']);
   assert.equal(media.id, 'media_1');
+});
+
+test('upload can use OIDC credentials when no read-write token is provided', async () => {
+  await withBlobEnv(
+    {
+      BLOB_READ_WRITE_TOKEN: undefined,
+      VERCEL_OIDC_TOKEN: 'oidc-token',
+      BLOB_STORE_ID: 'store_public',
+    },
+    async () => {
+      const media = await uploadPostMedia({
+        token: undefined,
+        postId: 'post_1',
+        file: imageFile(),
+        id: 'oidc-id',
+        context: {
+          post: { id: 'post_1', businessId: 'business_1' },
+          business: { id: 'business_1' },
+        },
+        storage: storageMock({
+          async put(pathname, _body, options) {
+            assert.equal(options.token, undefined);
+            assert.equal(options.oidcToken, 'oidc-token');
+            assert.equal(options.storeId, 'store_public');
+            return { url: `https://blob.example/${pathname}`, pathname };
+          },
+        }),
+        async createMediaRecord(record) {
+          assert.equal(record.isEdited, false);
+          return { id: 'media_oidc', ...record };
+        },
+      });
+
+      assert.equal(media.id, 'media_oidc');
+    },
+  );
+});
+
+test('OIDC credentials are preferred when both Blob auth modes are present', () => {
+  assert.deepEqual(
+    getBlobStorageAuth({
+      BLOB_READ_WRITE_TOKEN: 'old-token',
+      VERCEL_OIDC_TOKEN: 'oidc-token',
+      BLOB_STORE_ID: 'store_public',
+    }),
+    {
+      token: undefined,
+      oidcToken: 'oidc-token',
+      storeId: 'store_public',
+      hasReadWriteToken: true,
+      hasOidcToken: true,
+      hasBlobStoreId: true,
+      hasUsableCredentials: true,
+    },
+  );
+});
+
+test('read-write token remains supported when OIDC credentials are absent', () => {
+  assert.deepEqual(
+    getBlobStorageAuth({
+      BLOB_READ_WRITE_TOKEN: 'blob-token',
+      VERCEL_OIDC_TOKEN: undefined,
+      BLOB_STORE_ID: undefined,
+    }),
+    {
+      token: 'blob-token',
+      oidcToken: undefined,
+      storeId: undefined,
+      hasReadWriteToken: true,
+      hasOidcToken: false,
+      hasBlobStoreId: false,
+      hasUsableCredentials: true,
+    },
+  );
 });
 
 test('edited upload fields require post id and render dimensions', () => {
@@ -201,6 +315,14 @@ test('blob upload errors are safely classified for local troubleshooting', () =>
   assert.equal(
     buildBlobUploadErrorMessage({
       name: 'Error',
+      message: 'Vercel Blob: This store does not exist.',
+      status: null,
+    }),
+    'Blob upload failed: Blob store was not found. Check BLOB_STORE_ID and the Vercel Blob project connection.',
+  );
+  assert.equal(
+    buildBlobUploadErrorMessage({
+      name: 'Error',
       message: 'Unauthorized',
       status: 401,
     }),
@@ -252,25 +374,61 @@ test('delete removes media record after blob delete success', async () => {
   assert.deepEqual(result, { deleted: true });
 });
 
-test('missing BLOB_READ_WRITE_TOKEN returns a clear error', async () => {
-  assert.throws(() => requireBlobReadWriteToken(undefined), /Blob storage is not configured/);
+test('missing token and OIDC credentials returns a clear error', async () => {
+  assert.deepEqual(
+    getBlobStorageAuth({
+      BLOB_READ_WRITE_TOKEN: undefined,
+      VERCEL_OIDC_TOKEN: undefined,
+      BLOB_STORE_ID: undefined,
+    }),
+    {
+      token: undefined,
+      oidcToken: undefined,
+      storeId: undefined,
+      hasReadWriteToken: false,
+      hasOidcToken: false,
+      hasBlobStoreId: false,
+      hasUsableCredentials: false,
+    },
+  );
 
-  await assert.rejects(
+  assert.throws(
     () =>
-      uploadPostMedia({
-        token: undefined,
-        postId: 'post_1',
-        file: imageFile(),
-        context: {
-          post: { id: 'post_1', businessId: 'business_1' },
-          business: { id: 'business_1' },
-        },
-        storage: storageMock(),
-        async createMediaRecord(record) {
-          return { id: 'media_1', ...record };
-        },
-      }),
+      requireBlobStorageAuth(
+        getBlobStorageAuth({
+          BLOB_READ_WRITE_TOKEN: undefined,
+          VERCEL_OIDC_TOKEN: 'oidc-token',
+          BLOB_STORE_ID: undefined,
+        }),
+      ),
     /Blob storage is not configured/,
+  );
+
+  await withBlobEnv(
+    {
+      BLOB_READ_WRITE_TOKEN: undefined,
+      VERCEL_OIDC_TOKEN: undefined,
+      BLOB_STORE_ID: undefined,
+    },
+    async () => {
+      await assert.rejects(
+        () =>
+          uploadPostMedia({
+            token: undefined,
+            postId: 'post_1',
+            file: imageFile(),
+            context: {
+              post: { id: 'post_1', businessId: 'business_1' },
+              business: { id: 'business_1' },
+            },
+            storage: storageMock(),
+            async createMediaRecord(record) {
+              return { id: 'media_1', ...record };
+            },
+          }),
+        /Blob storage is not configured/,
+      );
+    },
   );
 });
 
