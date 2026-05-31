@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { PassThrough } from 'node:stream';
 import test from 'node:test';
 import { ApiError } from '../src/lib/api-helpers.ts';
 import {
@@ -17,6 +18,7 @@ import {
   type BlobStorageAdapter,
   type MediaUploadFile,
 } from '../src/lib/media/api.ts';
+import { parseMultipartFormData } from '../src/lib/media/multipart.ts';
 import { editedMediaUploadFieldsSchema } from '../src/lib/validation.ts';
 
 function imageFile(overrides: Partial<MediaUploadFile> = {}): MediaUploadFile {
@@ -117,6 +119,47 @@ test('upload rejects files over the MVP size limit', () => {
     () => assertValidImageUpload(imageFile({ size: maxImageUploadBytes + 1 })),
     ApiError,
   );
+});
+
+test('multipart parser reads post_id and file from a stream request', async () => {
+  const boundary = 'social-studio-boundary';
+  const body = Buffer.from(
+    [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="post_id"',
+      '',
+      '11111111-1111-4111-8111-111111111111',
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="launch.png"',
+      'Content-Type: image/png',
+      '',
+      'image-bytes',
+      `--${boundary}--`,
+      '',
+    ].join('\r\n'),
+    'binary',
+  );
+  const req = new PassThrough() as PassThrough & {
+    method?: string;
+    headers: Record<string, string>;
+    body?: unknown;
+  };
+  req.method = 'POST';
+  req.headers = {
+    'content-type': `multipart/form-data; boundary=${boundary}`,
+    'content-length': String(body.byteLength),
+  };
+
+  req.end(body);
+
+  const form = await parseMultipartFormData(req as never);
+
+  assert.deepEqual(Object.keys(form.fields), ['post_id']);
+  assert.equal(form.fields.post_id, '11111111-1111-4111-8111-111111111111');
+  assert.deepEqual(Object.keys(form.files), ['file']);
+  assert.equal(form.files.file.fileName, 'launch.png');
+  assert.equal(form.files.file.mimeType, 'image/png');
+  assert.equal(form.files.file.size, Buffer.byteLength('image-bytes'));
 });
 
 test('upload creates post_media only after storage success', async () => {

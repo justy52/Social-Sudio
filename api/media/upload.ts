@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleApiError, methodNotAllowed, sendJson } from '../../src/lib/api-helpers';
+import { ApiError, handleApiError, methodNotAllowed, sendJson } from '../../src/lib/api-helpers';
 import { requireAuth, requirePostOwnership } from '../../src/lib/auth';
 import { db } from '../../src/lib/db';
 import { postMedia } from '../../src/lib/db/schema';
@@ -31,6 +31,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hasBlobStoreId: Boolean(process.env.BLOB_STORE_ID),
     });
     const form = await parseMultipartFormData(req);
+    if (!form.fields.post_id) {
+      throw new ApiError(400, 'Post id is required');
+    }
+    if (!form.files.file) {
+      throw new ApiError(400, 'Image file is required');
+    }
     const postId = postIdSchema.parse(form.fields.post_id);
     logMediaUploadDiagnostics('route-reached', {
       route: 'upload',
