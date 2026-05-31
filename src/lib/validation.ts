@@ -93,8 +93,28 @@ export const postUpdateSchema = z
     return output;
   });
 
+export const captionToneSchema = z.enum(['professional', 'casual', 'funny', 'inspirational']);
+
+export const captionGenerateSchema = z
+  .object({
+    business_id: z.string().uuid(),
+    prompt_context: z.string().trim().min(1, 'Prompt context is required.').max(1200),
+    tone: captionToneSchema,
+    include_hashtags: z.boolean(),
+    image_description: z.string().trim().max(1200).optional(),
+  })
+  .strict()
+  .transform((input) => ({
+    businessId: input.business_id,
+    promptContext: input.prompt_context,
+    tone: input.tone,
+    includeHashtags: input.include_hashtags,
+    imageDescription: input.image_description,
+  }));
+
 export type BusinessCreateInput = z.infer<typeof businessCreateSchema>;
 export type BusinessUpdateInput = z.infer<typeof businessUpdateSchema>;
+export type CaptionGenerateInput = z.infer<typeof captionGenerateSchema>;
 export type PostCreateInput = z.infer<typeof postCreateSchema>;
 export type PostListQueryInput = z.infer<typeof postListQuerySchema>;
 export type PostUpdateInput = z.infer<typeof postUpdateSchema>;

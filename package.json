@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --test --experimental-strip-types tests/post-status.test.ts tests/post-ownership.test.ts tests/post-api.test.ts tests/media-api.test.ts tests/posts-client.test.ts",
+    "test:unit": "node --test --experimental-strip-types tests/post-status.test.ts tests/post-ownership.test.ts tests/post-api.test.ts tests/media-api.test.ts tests/posts-client.test.ts tests/captions-api.test.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "db:generate": "drizzle-kit generate",
