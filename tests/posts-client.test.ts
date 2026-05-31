@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createDraftPost, generateCaption, uploadEditedPostImage } from '../src/lib/posts/client.ts';
+import {
+  createDraftPost,
+  generateCaption,
+  uploadEditedPostImage,
+  uploadPostImage,
+} from '../src/lib/posts/client.ts';
 import { buildCaptionSelection } from '../src/lib/posts/captions-ui.ts';
 import {
   buildEditedImageFileName,
@@ -13,6 +18,7 @@ import {
   getFirstMediaPreviewUrl,
   validateClientImageFile,
 } from '../src/lib/posts/ui.ts';
+import { resolveLocalApiRoutePath } from '../vite.config.ts';
 
 test('createDraftPost calls the posts API with the selected business id', async () => {
   const originalFetch = globalThis.fetch;
@@ -219,6 +225,69 @@ test('uploadEditedPostImage posts edited PNG form data with auth', async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('uploadPostImage posts original image form data without forcing multipart content type', async () => {
+  const originalFetch = globalThis.fetch;
+  const file = new File(['image-bytes'], 'launch.png', { type: 'image/png' });
+
+  globalThis.fetch = async (input, init) => {
+    const formData = init?.body as FormData;
+
+    assert.equal(input, '/api/media/upload');
+    assert.equal(init?.method, 'POST');
+    assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer test-token');
+    assert.equal(new Headers(init?.headers).has('Content-Type'), false);
+    assert.equal(formData.get('post_id'), '11111111-1111-4111-8111-111111111111');
+    assert.equal((formData.get('file') as File).name, 'launch.png');
+
+    return new Response(
+      JSON.stringify({
+        media: {
+          id: 'media_original',
+          postId: '11111111-1111-4111-8111-111111111111',
+          blobUrl: 'https://blob.example/original.png',
+          blobKey: 'businesses/business_1/posts/post_1/original.png',
+          mimeType: 'image/png',
+          width: null,
+          height: null,
+          isEdited: false,
+          originalUrl: null,
+          createdAt: '2026-05-31T00:00:00.000Z',
+          updatedAt: '2026-05-31T00:00:00.000Z',
+        },
+      }),
+      { status: 201, headers: { 'Content-Type': 'application/json' } },
+    );
+  };
+
+  try {
+    const media = await uploadPostImage(
+      async () => 'test-token',
+      '11111111-1111-4111-8111-111111111111',
+      file,
+    );
+
+    assert.equal(media.isEdited, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('local API adapter includes media upload routes before the media key catchall', () => {
+  assert.deepEqual(resolveLocalApiRoutePath('/api/media/upload'), {
+    modulePath: '/api/media/upload.ts',
+    parseBody: true,
+  });
+  assert.deepEqual(resolveLocalApiRoutePath('/api/media/edited'), {
+    modulePath: '/api/media/edited.ts',
+    parseBody: true,
+  });
+  assert.deepEqual(resolveLocalApiRoutePath('/api/media/businesses%2Fbiz%2Fposts%2Fpost%2Ffile.png'), {
+    modulePath: '/api/media/[key].ts',
+    params: { key: 'businesses/biz/posts/post/file.png' },
+    parseBody: true,
+  });
 });
 
 test('status options expose only valid next transitions for the edit form', () => {

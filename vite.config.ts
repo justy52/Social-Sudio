@@ -65,26 +65,42 @@ function localApiPlugin() {
 }
 
 async function resolveApiRoute(server: ViteDevServer, pathname: string) {
+  const route = resolveLocalApiRoutePath(pathname);
+
+  if (!route) {
+    return null;
+  }
+
+  const module = await server.ssrLoadModule(route.modulePath);
+
+  return {
+    handler: module.default,
+    params: route.params,
+    parseBody: route.parseBody,
+  };
+}
+
+export function resolveLocalApiRoutePath(pathname: string) {
   if (pathname === '/api/businesses') {
-    const module = await server.ssrLoadModule('/api/businesses/index.ts');
-    return { handler: module.default, parseBody: true };
+    return { modulePath: '/api/businesses/index.ts', parseBody: true };
   }
 
   if (pathname === '/api/posts') {
-    const module = await server.ssrLoadModule('/api/posts/index.ts');
-    return { handler: module.default, parseBody: true };
+    return { modulePath: '/api/posts/index.ts', parseBody: true };
   }
 
   if (pathname === '/api/media/upload') {
-    const module = await server.ssrLoadModule('/api/media/upload.ts');
-    return { handler: module.default, parseBody: true };
+    return { modulePath: '/api/media/upload.ts', parseBody: true };
+  }
+
+  if (pathname === '/api/media/edited') {
+    return { modulePath: '/api/media/edited.ts', parseBody: true };
   }
 
   const businessMatch = pathname.match(/^\/api\/businesses\/([^/]+)$/);
   if (businessMatch) {
-    const module = await server.ssrLoadModule('/api/businesses/[id].ts');
     return {
-      handler: module.default,
+      modulePath: '/api/businesses/[id].ts',
       params: { id: decodeURIComponent(businessMatch[1]) },
       parseBody: true,
     };
@@ -92,9 +108,8 @@ async function resolveApiRoute(server: ViteDevServer, pathname: string) {
 
   const postMatch = pathname.match(/^\/api\/posts\/([^/]+)$/);
   if (postMatch) {
-    const module = await server.ssrLoadModule('/api/posts/[id].ts');
     return {
-      handler: module.default,
+      modulePath: '/api/posts/[id].ts',
       params: { id: decodeURIComponent(postMatch[1]) },
       parseBody: true,
     };
@@ -102,17 +117,15 @@ async function resolveApiRoute(server: ViteDevServer, pathname: string) {
 
   const mediaMatch = pathname.match(/^\/api\/media\/(.+)$/);
   if (mediaMatch) {
-    const module = await server.ssrLoadModule('/api/media/[key].ts');
     return {
-      handler: module.default,
+      modulePath: '/api/media/[key].ts',
       params: { key: decodeURIComponent(mediaMatch[1]) },
       parseBody: true,
     };
   }
 
   if (pathname === '/api/webhooks/clerk') {
-    const module = await server.ssrLoadModule('/api/webhooks/clerk.ts');
-    return { handler: module.default, parseBody: false };
+    return { modulePath: '/api/webhooks/clerk.ts', parseBody: false };
   }
 
   return null;

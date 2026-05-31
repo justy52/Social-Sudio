@@ -59,8 +59,18 @@ test('upload requires an owned post', () => {
 });
 
 test('upload rejects non-image MIME types', () => {
-  assert.throws(() => assertValidImageUpload(imageFile({ mimeType: 'application/pdf' })), ApiError);
-  assert.throws(() => assertValidImageUpload(imageFile({ mimeType: 'video/mp4' })), ApiError);
+  assert.throws(
+    () => assertValidImageUpload(imageFile({ mimeType: 'application/pdf' })),
+    /JPEG, PNG, or WebP/,
+  );
+  assert.throws(
+    () => assertValidImageUpload(imageFile({ mimeType: 'image/heic' })),
+    /HEIC and HEIF are not supported/,
+  );
+  assert.throws(
+    () => assertValidImageUpload(imageFile({ mimeType: 'video/mp4' })),
+    /JPEG, PNG, or WebP/,
+  );
 });
 
 test('upload rejects files over the MVP size limit', () => {
@@ -171,7 +181,7 @@ test('upload does not create post_media when storage fails', async () => {
           return { id: 'media_1', ...record };
         },
       }),
-    /Media upload failed/,
+    /Blob storage upload failed/,
   );
 
   assert.equal(createCalls, 0);
@@ -209,7 +219,7 @@ test('delete removes media record after blob delete success', async () => {
 });
 
 test('missing BLOB_READ_WRITE_TOKEN returns a clear error', async () => {
-  assert.throws(() => requireBlobReadWriteToken(undefined), /BLOB_READ_WRITE_TOKEN/);
+  assert.throws(() => requireBlobReadWriteToken(undefined), /Blob storage is not configured/);
 
   await assert.rejects(
     () =>
@@ -226,7 +236,7 @@ test('missing BLOB_READ_WRITE_TOKEN returns a clear error', async () => {
           return { id: 'media_1', ...record };
         },
       }),
-    /BLOB_READ_WRITE_TOKEN/,
+    /Blob storage is not configured/,
   );
 });
 

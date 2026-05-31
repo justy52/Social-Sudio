@@ -6,6 +6,7 @@ import { postMedia } from '../../src/lib/db/schema';
 import {
   assertMediaUploadAuthenticated,
   assertOwnedPostForMediaUpload,
+  logMediaUploadDiagnostics,
   uploadPostMedia,
 } from '../../src/lib/media/api';
 import { vercelBlobStorage } from '../../src/lib/media/blob';
@@ -21,6 +22,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const auth = await requireAuth(req);
     const form = await parseMultipartFormData(req);
     const fields = editedMediaUploadFieldsSchema.parse(form.fields);
+    logMediaUploadDiagnostics('route-reached', {
+      route: 'edited',
+      mimeType: form.files.file?.mimeType,
+      size: form.files.file?.size,
+      hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    });
     const { userId, post, business } = await requirePostOwnership(req, fields.postId);
 
     assertMediaUploadAuthenticated(auth.userId);

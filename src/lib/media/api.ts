@@ -58,7 +58,7 @@ export type CreateMediaRecordInput = {
 
 export function requireBlobReadWriteToken(token: string | undefined) {
   if (!token) {
-    throw new ApiError(500, 'Vercel Blob is not configured. Set BLOB_READ_WRITE_TOKEN.');
+    throw new ApiError(500, 'Blob storage is not configured.');
   }
 
   return token;
@@ -94,7 +94,7 @@ export function assertValidImageUpload(file: MediaUploadFile | null | undefined)
   }
 
   if (!allowedImageMimeTypes.includes(file.mimeType as (typeof allowedImageMimeTypes)[number])) {
-    throw new ApiError(400, 'Only JPEG, PNG, and WebP images are supported');
+    throw new ApiError(400, 'Choose a JPEG, PNG, or WebP image. HEIC and HEIF are not supported.');
   }
 
   if (file.size > maxImageUploadBytes) {
@@ -156,12 +156,25 @@ export async function uploadPostMedia<TMedia>(input: {
 
   let blob: BlobPutResult;
   try {
+    logMediaUploadDiagnostics('blob-upload-start', {
+      route: input.isEdited ? 'edited' : 'upload',
+      mimeType: file.mimeType,
+      size: file.size,
+      hasBlobToken: Boolean(input.token),
+    });
+
     blob = await input.storage.put(blobKey, file.buffer, {
       contentType: file.mimeType,
       token,
     });
   } catch {
-    throw new ApiError(502, 'Media upload failed. Please try again.');
+    logMediaUploadDiagnostics('blob-upload-failed', {
+      route: input.isEdited ? 'edited' : 'upload',
+      mimeType: file.mimeType,
+      size: file.size,
+      hasBlobToken: Boolean(input.token),
+    });
+    throw new ApiError(502, 'Blob storage upload failed. Check storage configuration.');
   }
 
   return input.createMediaRecord({
@@ -174,6 +187,22 @@ export async function uploadPostMedia<TMedia>(input: {
     width: input.width,
     height: input.height,
   });
+}
+
+export function logMediaUploadDiagnostics(
+  event: string,
+  details: {
+    route: 'upload' | 'edited';
+    mimeType?: string;
+    size?: number;
+    hasBlobToken: boolean;
+  },
+) {
+  if (process.env.NODE_ENV !== 'development') {
+    return;
+  }
+
+  console.info('[media]', event, details);
 }
 
 export async function deletePostMedia(input: {

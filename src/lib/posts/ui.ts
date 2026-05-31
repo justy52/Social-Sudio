@@ -35,7 +35,7 @@ export function formatHashtagsInput(hashtags: string[] | null | undefined) {
 
 export function validateClientImageFile(file: ImageLike) {
   if (!clientAllowedImageMimeTypes.includes(file.type as (typeof clientAllowedImageMimeTypes)[number])) {
-    throw new Error('Choose a JPEG, PNG, or WebP image.');
+    throw new Error('Choose a JPEG, PNG, or WebP image. HEIC and HEIF are not supported.');
   }
 
   if (file.size > clientMaxImageUploadBytes) {
