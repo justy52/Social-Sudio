@@ -1,4 +1,5 @@
 import type { PostStatus } from './status.ts';
+import { buildEditedImageUploadFormData } from './image-editor.ts';
 import { validateClientImageFile } from './ui.ts';
 
 export type AuthTokenProvider = () => Promise<string | null>;
@@ -131,6 +132,24 @@ export async function deletePostImage(getToken: AuthTokenProvider, blobKey: stri
   await authedRequest<{ deleted: true }>(getToken, `/api/media/${encodeURIComponent(blobKey)}`, {
     method: 'DELETE',
   });
+}
+
+export async function uploadEditedPostImage(
+  getToken: AuthTokenProvider,
+  input: {
+    postId: string;
+    file: Blob;
+    width: number;
+    height: number;
+    originalUrl?: string | null;
+  },
+) {
+  const data = await authedRequest<{ media: PostMediaRecord }>(getToken, '/api/media/edited', {
+    method: 'POST',
+    body: buildEditedImageUploadFormData(input),
+  });
+
+  return data.media;
 }
 
 export async function generateCaption(

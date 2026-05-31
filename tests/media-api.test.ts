@@ -14,6 +14,7 @@ import {
   type BlobStorageAdapter,
   type MediaUploadFile,
 } from '../src/lib/media/api.ts';
+import { editedMediaUploadFieldsSchema } from '../src/lib/validation.ts';
 
 function imageFile(overrides: Partial<MediaUploadFile> = {}): MediaUploadFile {
   const buffer = Buffer.from('image-bytes');
@@ -97,6 +98,54 @@ test('upload creates post_media only after storage success', async () => {
 
   assert.deepEqual(calls, ['blob', 'db']);
   assert.equal(media.id, 'media_1');
+});
+
+test('edited upload fields require post id and render dimensions', () => {
+  const fields = editedMediaUploadFieldsSchema.parse({
+    post_id: '11111111-1111-4111-8111-111111111111',
+    width: '1080',
+    height: '1350',
+    original_url: 'https://blob.example/original.png',
+  });
+
+  assert.deepEqual(fields, {
+    postId: '11111111-1111-4111-8111-111111111111',
+    width: 1080,
+    height: 1350,
+    originalUrl: 'https://blob.example/original.png',
+  });
+  assert.throws(() =>
+    editedMediaUploadFieldsSchema.parse({
+      post_id: 'not-a-post-id',
+      width: '0',
+      height: '1350',
+    }),
+  );
+});
+
+test('edited upload marks media as edited and keeps render metadata', async () => {
+  const media = await uploadPostMedia({
+    token: 'blob-token',
+    postId: 'post_1',
+    file: imageFile({ fileName: 'Edited.png' }),
+    id: 'edited-id',
+    context: { post: { id: 'post_1', businessId: 'business_1' }, business: { id: 'business_1' } },
+    storage: storageMock(),
+    isEdited: true,
+    originalUrl: 'https://blob.example/original.png',
+    width: 1080,
+    height: 1350,
+    async createMediaRecord(record) {
+      assert.equal(record.isEdited, true);
+      assert.equal(record.originalUrl, 'https://blob.example/original.png');
+      assert.equal(record.width, 1080);
+      assert.equal(record.height, 1350);
+      assert.equal(record.blobKey, 'businesses/business_1/posts/post_1/edited-id-edited.png');
+      return { id: 'media_edited', ...record };
+    },
+  });
+
+  assert.equal(media.id, 'media_edited');
 });
 
 test('upload does not create post_media when storage fails', async () => {

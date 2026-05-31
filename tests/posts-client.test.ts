@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createDraftPost, generateCaption } from '../src/lib/posts/client.ts';
+import { createDraftPost, generateCaption, uploadEditedPostImage } from '../src/lib/posts/client.ts';
 import { buildCaptionSelection } from '../src/lib/posts/captions-ui.ts';
+import {
+  buildEditedImageFileName,
+  buildEditedImageUploadFormData,
+  calculateImageDrawRect,
+  parseImageSizePreset,
+} from '../src/lib/posts/image-editor.ts';
 import {
   getAvailableStatusOptions,
   getFirstMediaPreviewUrl,
@@ -108,6 +114,111 @@ test('caption selection helper prepares generated caption values for the editor 
       aiGenerated: true,
     },
   );
+});
+
+test('image editor parses supported size presets', () => {
+  assert.deepEqual(parseImageSizePreset('1080x1350'), {
+    id: '1080x1350',
+    label: 'Instagram portrait',
+    width: 1080,
+    height: 1350,
+  });
+  assert.throws(() => parseImageSizePreset('1920x1080'), /Unsupported image size preset/);
+});
+
+test('image editor calculates fit and fill background rectangles', () => {
+  assert.deepEqual(
+    calculateImageDrawRect({
+      sourceWidth: 2000,
+      sourceHeight: 1000,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      fit: 'fit',
+    }),
+    { x: 0, y: 270, width: 1080, height: 540 },
+  );
+
+  assert.deepEqual(
+    calculateImageDrawRect({
+      sourceWidth: 2000,
+      sourceHeight: 1000,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      fit: 'fill',
+    }),
+    { x: -540, y: 0, width: 2160, height: 1080 },
+  );
+});
+
+test('edited image upload form data includes render metadata', () => {
+  const blob = new Blob(['png-bytes'], { type: 'image/png' });
+  const formData = buildEditedImageUploadFormData({
+    postId: '11111111-1111-4111-8111-111111111111',
+    file: blob,
+    width: 1080,
+    height: 566,
+    originalUrl: 'https://blob.example/original.png',
+  });
+
+  assert.equal(formData.get('post_id'), '11111111-1111-4111-8111-111111111111');
+  assert.equal(formData.get('width'), '1080');
+  assert.equal(formData.get('height'), '566');
+  assert.equal(formData.get('original_url'), 'https://blob.example/original.png');
+  assert.equal((formData.get('file') as File).name, 'edited-11111111-1111-4111-8111-111111111111.png');
+  assert.equal(buildEditedImageFileName('post_1'), 'edited-post_1.png');
+});
+
+test('uploadEditedPostImage posts edited PNG form data with auth', async () => {
+  const originalFetch = globalThis.fetch;
+  const blob = new Blob(['png-bytes'], { type: 'image/png' });
+
+  globalThis.fetch = async (input, init) => {
+    const formData = init?.body as FormData;
+
+    assert.equal(input, '/api/media/edited');
+    assert.equal(init?.method, 'POST');
+    assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer test-token');
+    assert.equal(new Headers(init?.headers).has('Content-Type'), false);
+    assert.equal(formData.get('post_id'), '11111111-1111-4111-8111-111111111111');
+    assert.equal(formData.get('width'), '1200');
+    assert.equal(formData.get('height'), '630');
+    assert.equal(formData.get('original_url'), 'https://blob.example/original.png');
+    assert.equal((formData.get('file') as File).name, 'edited-11111111-1111-4111-8111-111111111111.png');
+
+    return new Response(
+      JSON.stringify({
+        media: {
+          id: 'media_edited',
+          postId: '11111111-1111-4111-8111-111111111111',
+          blobUrl: 'https://blob.example/edited.png',
+          blobKey: 'businesses/business_1/posts/post_1/edited.png',
+          mimeType: 'image/png',
+          width: 1200,
+          height: 630,
+          isEdited: true,
+          originalUrl: 'https://blob.example/original.png',
+          createdAt: '2026-05-31T00:00:00.000Z',
+          updatedAt: '2026-05-31T00:00:00.000Z',
+        },
+      }),
+      { status: 201, headers: { 'Content-Type': 'application/json' } },
+    );
+  };
+
+  try {
+    const media = await uploadEditedPostImage(async () => 'test-token', {
+      postId: '11111111-1111-4111-8111-111111111111',
+      file: blob,
+      width: 1200,
+      height: 630,
+      originalUrl: 'https://blob.example/original.png',
+    });
+
+    assert.equal(media.isEdited, true);
+    assert.equal(media.width, 1200);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('status options expose only valid next transitions for the edit form', () => {

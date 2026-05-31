@@ -60,6 +60,21 @@ export const postListQuerySchema = z
 
 export const postIdSchema = z.string().uuid();
 
+export const editedMediaUploadFieldsSchema = z
+  .object({
+    post_id: z.string().uuid(),
+    original_url: z.string().url().optional(),
+    width: z.coerce.number().int().positive().max(5000),
+    height: z.coerce.number().int().positive().max(5000),
+  })
+  .passthrough()
+  .transform((input) => ({
+    postId: input.post_id,
+    originalUrl: input.original_url,
+    width: input.width,
+    height: input.height,
+  }));
+
 export const postUpdateSchema = z
   .object({
     caption: postTextField.optional(),
@@ -115,6 +130,7 @@ export const captionGenerateSchema = z
 export type BusinessCreateInput = z.infer<typeof businessCreateSchema>;
 export type BusinessUpdateInput = z.infer<typeof businessUpdateSchema>;
 export type CaptionGenerateInput = z.infer<typeof captionGenerateSchema>;
+export type EditedMediaUploadFieldsInput = z.infer<typeof editedMediaUploadFieldsSchema>;
 export type PostCreateInput = z.infer<typeof postCreateSchema>;
 export type PostListQueryInput = z.infer<typeof postListQuerySchema>;
 export type PostUpdateInput = z.infer<typeof postUpdateSchema>;

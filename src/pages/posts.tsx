@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImagePlus, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { CaptionGenerator } from '@/components/posts/caption-generator';
+import { ImageEditor } from '@/components/posts/image-editor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +25,7 @@ import {
   uploadPostImage,
 } from '@/lib/posts/client';
 import type { CaptionGeneratorSelection } from '@/lib/posts/captions-ui';
+import { getFirstOriginalMedia } from '@/lib/posts/image-editor';
 import type { PostStatus } from '@/lib/posts/status';
 import {
   formatHashtagsInput,
@@ -315,6 +317,7 @@ export function PostsPage() {
           detail={selectedDetail}
           businessId={activeBusiness?.id}
           getToken={getToken}
+          businessLogoUrl={activeBusiness?.logoUrl}
           form={form}
           statusOptions={statusOptions}
           isLoading={detailQuery.isLoading}
@@ -334,6 +337,14 @@ export function PostsPage() {
             if (window.confirm('Delete this draft post?')) {
               deletePostMutation.mutate();
             }
+          }}
+          onEditedImageSaved={async () => {
+            setMessage('Edited image saved.');
+            setError(null);
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] }),
+              queryClient.invalidateQueries({ queryKey: ['post', selectedPostId] }),
+            ]);
           }}
         />
       </div>
@@ -388,6 +399,7 @@ function PostEditor({
   detail,
   businessId,
   getToken,
+  businessLogoUrl,
   form,
   statusOptions,
   isLoading,
@@ -400,10 +412,12 @@ function PostEditor({
   onUpload,
   onDeleteMedia,
   onDeletePost,
+  onEditedImageSaved,
 }: {
   detail: PostDetail | undefined;
   businessId: string | undefined;
   getToken: () => Promise<string | null>;
+  businessLogoUrl: string | null | undefined;
   form: PostFormState;
   statusOptions: PostStatus[];
   isLoading: boolean;
@@ -416,6 +430,7 @@ function PostEditor({
   onUpload: (files: File[]) => void;
   onDeleteMedia: (media: PostMediaRecord) => void;
   onDeletePost: () => void;
+  onEditedImageSaved: (media: PostMediaRecord) => Promise<void> | void;
 }) {
   if (isLoading) {
     return (
@@ -441,6 +456,8 @@ function PostEditor({
       </Card>
     );
   }
+
+  const editorBackground = getFirstOriginalMedia(detail.media);
 
   return (
     <Card>
@@ -572,6 +589,14 @@ function PostEditor({
             </div>
           </div>
 
+          <ImageEditor
+            postId={detail.post.id}
+            backgroundMedia={editorBackground}
+            businessLogoUrl={businessLogoUrl}
+            getToken={getToken}
+            onSaved={onEditedImageSaved}
+          />
+
           {detail.media.length === 0 ? (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
               No images uploaded yet.
@@ -584,7 +609,12 @@ function PostEditor({
                     <img src={media.blobUrl} alt="" className="h-full w-full object-cover" />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <p className="truncate text-xs text-muted-foreground">{media.mimeType}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs text-muted-foreground">{media.mimeType}</p>
+                      {media.isEdited && (
+                        <p className="text-xs font-medium text-primary">Edited</p>
+                      )}
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"

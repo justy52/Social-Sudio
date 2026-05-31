@@ -132,6 +132,10 @@ export async function uploadPostMedia<TMedia>(input: {
   storage: BlobStorageAdapter;
   createMediaRecord: (record: CreateMediaRecordInput) => Promise<TMedia>;
   id?: string;
+  isEdited?: boolean;
+  originalUrl?: string | null;
+  width?: number;
+  height?: number;
 }) {
   const token = requireBlobReadWriteToken(input.token);
   assertValidImageUpload(input.file);
@@ -165,8 +169,10 @@ export async function uploadPostMedia<TMedia>(input: {
     blobUrl: blob.url,
     blobKey: blob.pathname ?? blobKey,
     mimeType: file.mimeType,
-    isEdited: false,
-    originalUrl: null,
+    isEdited: input.isEdited ?? false,
+    originalUrl: input.originalUrl ?? null,
+    width: input.width,
+    height: input.height,
   });
 }
 
