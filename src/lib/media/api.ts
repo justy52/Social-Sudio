@@ -158,8 +158,10 @@ export async function uploadPostMedia<TMedia>(input: {
   try {
     logMediaUploadDiagnostics('blob-upload-start', {
       route: input.isEdited ? 'edited' : 'upload',
+      fileName: file.fileName,
       mimeType: file.mimeType,
       size: file.size,
+      postIdPresent: Boolean(input.postId),
       hasBlobToken: Boolean(input.token),
     });
 
@@ -167,14 +169,18 @@ export async function uploadPostMedia<TMedia>(input: {
       contentType: file.mimeType,
       token,
     });
-  } catch {
+  } catch (error) {
+    const safeBlobError = readSafeBlobError(error);
     logMediaUploadDiagnostics('blob-upload-failed', {
       route: input.isEdited ? 'edited' : 'upload',
+      fileName: file.fileName,
       mimeType: file.mimeType,
       size: file.size,
+      postIdPresent: Boolean(input.postId),
       hasBlobToken: Boolean(input.token),
+      blobError: safeBlobError,
     });
-    throw new ApiError(502, 'Blob storage upload failed. Check storage configuration.');
+    throw new ApiError(502, buildBlobUploadErrorMessage(safeBlobError));
   }
 
   return input.createMediaRecord({
@@ -193,9 +199,12 @@ export function logMediaUploadDiagnostics(
   event: string,
   details: {
     route: 'upload' | 'edited';
+    fileName?: string;
     mimeType?: string;
     size?: number;
+    postIdPresent?: boolean;
     hasBlobToken: boolean;
+    blobError?: SafeBlobError;
   },
 ) {
   if (process.env.NODE_ENV !== 'development') {
@@ -203,6 +212,68 @@ export function logMediaUploadDiagnostics(
   }
 
   console.info('[media]', event, details);
+}
+
+export type SafeBlobError = {
+  name: string | null;
+  message: string | null;
+  status: number | null;
+};
+
+export function readSafeBlobError(error: unknown): SafeBlobError {
+  if (!error || typeof error !== 'object') {
+    return {
+      name: null,
+      message: typeof error === 'string' ? error : null,
+      status: null,
+    };
+  }
+
+  const value = error as {
+    name?: unknown;
+    message?: unknown;
+    status?: unknown;
+    statusCode?: unknown;
+  };
+  const status = typeof value.status === 'number'
+    ? value.status
+    : typeof value.statusCode === 'number'
+      ? value.statusCode
+      : null;
+
+  return {
+    name: typeof value.name === 'string' ? value.name : null,
+    message: typeof value.message === 'string' ? value.message : null,
+    status,
+  };
+}
+
+export function buildBlobUploadErrorMessage(error: SafeBlobError) {
+  const message = error.message ?? '';
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes('no read-write token') || lowerMessage.includes('no blob credentials')) {
+    return 'Blob upload failed: missing token.';
+  }
+
+  if (lowerMessage.includes('cannot use public access on a private store')) {
+    return 'Blob upload failed: this Blob store is private, but Social Studio needs public Blob storage for image previews.';
+  }
+
+  if (
+    lowerMessage.includes('unauthorized') ||
+    lowerMessage.includes('forbidden') ||
+    error.status === 401 ||
+    error.status === 403
+  ) {
+    return 'Blob upload failed: unauthorized token.';
+  }
+
+  if (lowerMessage.includes('invalid') || error.status === 400) {
+    return 'Blob upload failed: invalid request.';
+  }
+
+  return 'Blob storage upload failed. Check storage configuration.';
 }
 
 export async function deletePostMedia(input: {

@@ -24,8 +24,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const fields = editedMediaUploadFieldsSchema.parse(form.fields);
     logMediaUploadDiagnostics('route-reached', {
       route: 'edited',
+      fileName: form.files.file?.fileName,
       mimeType: form.files.file?.mimeType,
       size: form.files.file?.size,
+      postIdPresent: Boolean(form.fields.post_id),
       hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
     });
     const { userId, post, business } = await requirePostOwnership(req, fields.postId);

@@ -6,8 +6,10 @@ import {
   assertOwnedMediaForDelete,
   assertOwnedPostForMediaUpload,
   assertValidImageUpload,
+  buildBlobUploadErrorMessage,
   deletePostMedia,
   maxImageUploadBytes,
+  readSafeBlobError,
   requireBlobReadWriteToken,
   sanitizeFileName,
   uploadPostMedia,
@@ -185,6 +187,38 @@ test('upload does not create post_media when storage fails', async () => {
   );
 
   assert.equal(createCalls, 0);
+});
+
+test('blob upload errors are safely classified for local troubleshooting', () => {
+  assert.equal(
+    buildBlobUploadErrorMessage({
+      name: 'Error',
+      message: 'Vercel Blob: Cannot use public access on a private store.',
+      status: null,
+    }),
+    'Blob upload failed: this Blob store is private, but Social Studio needs public Blob storage for image previews.',
+  );
+  assert.equal(
+    buildBlobUploadErrorMessage({
+      name: 'Error',
+      message: 'Unauthorized',
+      status: 401,
+    }),
+    'Blob upload failed: unauthorized token.',
+  );
+  assert.equal(
+    buildBlobUploadErrorMessage({
+      name: 'Error',
+      message: 'Invalid request',
+      status: 400,
+    }),
+    'Blob upload failed: invalid request.',
+  );
+  assert.deepEqual(readSafeBlobError(new Error('boom')), {
+    name: 'Error',
+    message: 'boom',
+    status: null,
+  });
 });
 
 test('delete requires media ownership', () => {
