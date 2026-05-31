@@ -565,7 +565,7 @@ function PostEditor({
         <div className="space-y-3 border-t border-border pt-5">
           <div>
             <h3 className="text-sm font-semibold">Images</h3>
-            <p className="mt-1 text-sm text-muted-foreground">JPEG, PNG, or WebP. Maximum 10MB.</p>
+            <p className="mt-1 text-sm text-muted-foreground">JPEG, PNG, or WebP. Maximum 4MB.</p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

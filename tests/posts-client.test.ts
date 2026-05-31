@@ -274,6 +274,31 @@ test('uploadPostImage posts original image form data without forcing multipart c
   }
 });
 
+test('uploadPostImage surfaces platform payload limit errors clearly', async () => {
+  const originalFetch = globalThis.fetch;
+  const file = new File(['image-bytes'], 'launch.png', { type: 'image/png' });
+
+  globalThis.fetch = async () =>
+    new Response('Payload Too Large', {
+      status: 413,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+
+  try {
+    await assert.rejects(
+      () =>
+        uploadPostImage(
+          async () => 'test-token',
+          '11111111-1111-4111-8111-111111111111',
+          file,
+        ),
+      /4MB or smaller/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('local API adapter includes media upload routes before the media key catchall', () => {
   assert.deepEqual(resolveLocalApiRoutePath('/api/media/upload'), {
     modulePath: '/api/media/upload.ts',
@@ -304,6 +329,13 @@ test('client upload validation rejects non-image files', () => {
   assert.throws(
     () => validateClientImageFile({ name: 'brief.pdf', size: 100, type: 'application/pdf' }),
     /JPEG, PNG, or WebP/,
+  );
+});
+
+test('client upload validation rejects images over the Vercel request limit', () => {
+  assert.throws(
+    () => validateClientImageFile({ name: 'large.jpg', size: 4 * 1024 * 1024 + 1, type: 'image/jpeg' }),
+    /4MB or smaller/,
   );
 });
 

@@ -1,7 +1,7 @@
 import { allowedPostStatusTransitions, type PostStatus } from './status.ts';
 
 export const clientAllowedImageMimeTypes = ['image/jpeg', 'image/png', 'image/webp'] as const;
-export const clientMaxImageUploadBytes = 10 * 1024 * 1024;
+export const clientMaxImageUploadBytes = 4 * 1024 * 1024;
 
 export type ImageLike = {
   name: string;
@@ -39,7 +39,7 @@ export function validateClientImageFile(file: ImageLike) {
   }
 
   if (file.size > clientMaxImageUploadBytes) {
-    throw new Error('Image must be 10MB or smaller.');
+    throw new Error('Image must be 4MB or smaller.');
   }
 }
 

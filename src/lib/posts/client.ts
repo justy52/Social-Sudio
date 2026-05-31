@@ -184,11 +184,39 @@ async function authedRequest<T>(
     ...init,
     headers,
   });
-  const payload = (await response.json().catch(() => null)) as T | { error?: string } | null;
+  const responseText = await response.text().catch(() => '');
+  const payload = parseResponsePayload<T>(responseText);
 
   if (!response.ok) {
-    throw new Error((payload as { error?: string } | null)?.error ?? 'Request failed.');
+    throw new Error(
+      (payload as { error?: string } | null)?.error ??
+        buildRequestErrorMessage(response.status, responseText),
+    );
   }
 
   return payload as T;
+}
+
+function parseResponsePayload<T>(responseText: string) {
+  if (!responseText) {
+    return null as T | { error?: string } | null;
+  }
+
+  try {
+    return JSON.parse(responseText) as T | { error?: string };
+  } catch {
+    return null;
+  }
+}
+
+function buildRequestErrorMessage(status: number, responseText: string) {
+  if (status === 413) {
+    return 'Image is too large for upload. Choose an image 4MB or smaller.';
+  }
+
+  if (status >= 400) {
+    return `Request failed (${status}).`;
+  }
+
+  return responseText || 'Request failed.';
 }
