@@ -46,7 +46,24 @@ export type UpdatePostInput = {
   hashtags?: string[];
   platform_size?: string;
   notes?: string;
+  ai_generated?: boolean;
   status?: PostStatus;
+};
+
+export type CaptionTone = 'professional' | 'casual' | 'funny' | 'inspirational';
+
+export type GenerateCaptionInput = {
+  business_id: string;
+  prompt_context: string;
+  tone: CaptionTone;
+  include_hashtags: boolean;
+  image_description?: string;
+};
+
+export type GeneratedCaption = {
+  caption: string;
+  hashtags: string[];
+  alternatives: string[];
 };
 
 export function buildCreateDraftPayload(businessId: string) {
@@ -113,6 +130,16 @@ export async function uploadPostImage(getToken: AuthTokenProvider, postId: strin
 export async function deletePostImage(getToken: AuthTokenProvider, blobKey: string) {
   await authedRequest<{ deleted: true }>(getToken, `/api/media/${encodeURIComponent(blobKey)}`, {
     method: 'DELETE',
+  });
+}
+
+export async function generateCaption(
+  getToken: AuthTokenProvider,
+  input: GenerateCaptionInput,
+) {
+  return authedRequest<GeneratedCaption>(getToken, '/api/captions/generate', {
+    method: 'POST',
+    body: JSON.stringify(input),
   });
 }
 

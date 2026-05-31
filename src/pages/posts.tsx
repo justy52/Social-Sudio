@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImagePlus, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { CaptionGenerator } from '@/components/posts/caption-generator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,7 @@ import {
   updatePost,
   uploadPostImage,
 } from '@/lib/posts/client';
+import type { CaptionGeneratorSelection } from '@/lib/posts/captions-ui';
 import type { PostStatus } from '@/lib/posts/status';
 import {
   formatHashtagsInput,
@@ -38,6 +40,7 @@ type PostFormState = {
   platformSize: string;
   notes: string;
   status: PostStatus;
+  aiGenerated: boolean;
 };
 
 const platformSizes = ['1080x1080', '1080x1350', '1080x566', '1200x630'];
@@ -55,6 +58,7 @@ const emptyForm: PostFormState = {
   platformSize: '1080x1080',
   notes: '',
   status: 'draft',
+  aiGenerated: false,
 };
 
 export function PostsPage() {
@@ -98,6 +102,7 @@ export function PostsPage() {
       platformSize: detail.post.platformSize,
       notes: detail.post.notes ?? '',
       status: detail.post.status,
+      aiGenerated: detail.post.aiGenerated,
     });
   }, [detailQuery.data]);
 
@@ -132,6 +137,7 @@ export function PostsPage() {
         hashtags: parseHashtagsInput(form.hashtags),
         platform_size: form.platformSize,
         notes: form.notes,
+        ai_generated: form.aiGenerated,
         status: form.status,
       });
     },
@@ -307,6 +313,8 @@ export function PostsPage() {
 
         <PostEditor
           detail={selectedDetail}
+          businessId={activeBusiness?.id}
+          getToken={getToken}
           form={form}
           statusOptions={statusOptions}
           isLoading={detailQuery.isLoading}
@@ -378,6 +386,8 @@ function PostListCard({
 
 function PostEditor({
   detail,
+  businessId,
+  getToken,
   form,
   statusOptions,
   isLoading,
@@ -392,6 +402,8 @@ function PostEditor({
   onDeletePost,
 }: {
   detail: PostDetail | undefined;
+  businessId: string | undefined;
+  getToken: () => Promise<string | null>;
   form: PostFormState;
   statusOptions: PostStatus[];
   isLoading: boolean;
@@ -497,6 +509,16 @@ function PostEditor({
           />
         </div>
 
+        {businessId && (
+          <CaptionGenerator
+            businessId={businessId}
+            getToken={getToken}
+            onUseCaption={(selection) => {
+              onChange(applyCaptionSelection(form, selection));
+            }}
+          />
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="post-hashtags">Hashtags</Label>
           <Input
@@ -594,4 +616,16 @@ function formatDate(value: string) {
 
 function readError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function applyCaptionSelection(
+  form: PostFormState,
+  selection: CaptionGeneratorSelection,
+): PostFormState {
+  return {
+    ...form,
+    caption: selection.caption,
+    hashtags: formatHashtagsInput(selection.hashtags),
+    aiGenerated: selection.aiGenerated,
+  };
 }
