@@ -3,10 +3,19 @@ import test from 'node:test';
 import {
   createDraftPost,
   generateCaption,
+  updatePost,
   uploadEditedPostImage,
   uploadPostImage,
+  type PostDetail,
 } from '../src/lib/posts/client.ts';
 import { buildCaptionSelection } from '../src/lib/posts/captions-ui.ts';
+import {
+  assertCanExportPost,
+  buildFullPostText,
+  formatHashtagsForPost,
+  prepareManualExport,
+  selectExportMedia,
+} from '../src/lib/posts/export.ts';
 import {
   buildEditedImageFileName,
   buildEditedImageUploadFormData,
@@ -120,6 +129,88 @@ test('caption selection helper prepares generated caption values for the editor 
       aiGenerated: true,
     },
   );
+});
+
+const exportDetail: PostDetail = {
+  post: {
+    id: 'post_1',
+    businessId: 'business_1',
+    status: 'approved',
+    caption: 'Finished cedar privacy fence.',
+    hashtags: ['FenceLife', '#HeberCity'],
+    platformSize: '1080x1080',
+    notes: null,
+    aiGenerated: false,
+    exportedAt: null,
+    createdAt: '2026-05-31T00:00:00.000Z',
+    updatedAt: '2026-05-31T00:00:00.000Z',
+  },
+  media: [
+    {
+      id: 'media_original',
+      postId: 'post_1',
+      blobUrl: 'https://blob.example/original.png',
+      blobKey: 'businesses/business_1/posts/post_1/original.png',
+      mimeType: 'image/png',
+      width: null,
+      height: null,
+      isEdited: false,
+      originalUrl: null,
+      createdAt: '2026-05-31T00:00:00.000Z',
+      updatedAt: '2026-05-31T00:00:00.000Z',
+    },
+    {
+      id: 'media_edited',
+      postId: 'post_1',
+      blobUrl: 'https://blob.example/edited.png',
+      blobKey: 'businesses/business_1/posts/post_1/edited.png',
+      mimeType: 'image/png',
+      width: 1080,
+      height: 1080,
+      isEdited: true,
+      originalUrl: 'https://blob.example/original.png',
+      createdAt: '2026-05-31T00:00:00.000Z',
+      updatedAt: '2026-05-31T00:00:00.000Z',
+    },
+  ],
+};
+
+test('export action chooses edited image before original image', () => {
+  const prepared = prepareManualExport(exportDetail);
+
+  assert.equal(prepared.media.id, 'media_edited');
+  assert.equal(selectExportMedia(exportDetail.media)?.id, 'media_edited');
+  assert.equal(prepared.fileName, 'social-studio-1080x1080-post_1.png');
+});
+
+test('export action falls back to original image when no edited image exists', () => {
+  const prepared = prepareManualExport({
+    ...exportDetail,
+    media: exportDetail.media
+      .filter((media) => !media.isEdited)
+      .map((media) => ({ ...media, mimeType: 'image/jpeg', blobUrl: 'https://blob.example/original.jpg' })),
+  });
+
+  assert.equal(prepared.media.id, 'media_original');
+  assert.equal(prepared.fileName, 'social-studio-1080x1080-post_1.jpg');
+});
+
+test('caption and hashtag clipboard text is formatted for manual posting', () => {
+  assert.equal(formatHashtagsForPost(['FenceLife', ' #HeberCity ']), '#FenceLife #HeberCity');
+  assert.equal(
+    buildFullPostText({
+      caption: 'Finished cedar privacy fence. ',
+      hashtags: ['FenceLife', '#HeberCity'],
+    }),
+    'Finished cedar privacy fence.\n\n#FenceLife #HeberCity',
+  );
+});
+
+test('export guard allows approved and exported posts only', () => {
+  assert.doesNotThrow(() => assertCanExportPost('approved'));
+  assert.doesNotThrow(() => assertCanExportPost('exported'));
+  assert.throws(() => assertCanExportPost('draft'), /Approve this post/);
+  assert.throws(() => prepareManualExport({ ...exportDetail, post: { ...exportDetail.post, status: 'draft' } }), /Approve this post/);
 });
 
 test('image editor parses supported size presets', () => {
@@ -293,6 +384,68 @@ test('uploadPostImage surfaces platform payload limit errors clearly', async () 
           file,
         ),
       /4MB or smaller/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('export status update is sent without client-controlled exported_at', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (input, init) => {
+    const body = JSON.parse(String(init?.body));
+
+    assert.equal(input, '/api/posts/post_1');
+    assert.equal(init?.method, 'PUT');
+    assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer test-token');
+    assert.equal(body.status, 'exported');
+    assert.equal('exported_at' in body, false);
+    assert.equal('exportedAt' in body, false);
+
+    return new Response(
+      JSON.stringify({
+        post: {
+          id: 'post_1',
+          businessId: 'business_1',
+          status: 'exported',
+          caption: 'Finished cedar privacy fence.',
+          hashtags: ['#FenceLife'],
+          platformSize: '1080x1080',
+          notes: null,
+          aiGenerated: false,
+          exportedAt: '2026-05-31T12:00:00.000Z',
+          createdAt: '2026-05-31T00:00:00.000Z',
+          updatedAt: '2026-05-31T12:00:00.000Z',
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  };
+
+  try {
+    const post = await updatePost(async () => 'test-token', 'post_1', { status: 'exported' });
+
+    assert.equal(post.status, 'exported');
+    assert.equal(post.exportedAt, '2026-05-31T12:00:00.000Z');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('client request errors stay safe for export actions', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: 'Approve this post before exporting.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  try {
+    await assert.rejects(
+      () => updatePost(async () => 'test-token', 'post_1', { status: 'exported' }),
+      /Approve this post before exporting/,
     );
   } finally {
     globalThis.fetch = originalFetch;

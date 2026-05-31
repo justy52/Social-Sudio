@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ImagePlus, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { Copy, Download, ImagePlus, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { CaptionGenerator } from '@/components/posts/caption-generator';
 import { ImageEditor } from '@/components/posts/image-editor';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,15 @@ import {
   uploadPostImage,
 } from '@/lib/posts/client';
 import type { CaptionGeneratorSelection } from '@/lib/posts/captions-ui';
+import {
+  buildFullPostText,
+  canExportPost,
+  copyTextToClipboard,
+  downloadImageFromUrl,
+  formatHashtagsForPost,
+  prepareManualExport,
+  selectExportMedia,
+} from '@/lib/posts/export';
 import { getFirstOriginalMedia } from '@/lib/posts/image-editor';
 import type { PostStatus } from '@/lib/posts/status';
 import {
@@ -221,6 +230,50 @@ export function PostsPage() {
     },
   });
 
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedDetail) {
+        throw new Error('Select a post before exporting.');
+      }
+
+      const hashtags = parseHashtagsInput(form.hashtags);
+      const exportDetail: PostDetail = {
+        post: {
+          ...selectedDetail.post,
+          caption: form.caption,
+          hashtags,
+          platformSize: form.platformSize,
+        },
+        media: selectedDetail.media,
+      };
+      const prepared = prepareManualExport(exportDetail);
+
+      await downloadImageFromUrl(prepared.media.blobUrl, prepared.fileName);
+      await copyTextToClipboard(prepared.text);
+
+      return updatePost(getToken, selectedDetail.post.id, {
+        caption: form.caption,
+        hashtags,
+        platform_size: form.platformSize,
+        notes: form.notes,
+        ai_generated: form.aiGenerated,
+        status: 'exported',
+      });
+    },
+    onSuccess: async () => {
+      setMessage('Image downloaded. Caption copied. Ready to post.');
+      setError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['post', selectedPostId] }),
+      ]);
+    },
+    onError: (mutationError) => {
+      setError(readError(mutationError, 'Could not export post.'));
+      setMessage(null);
+    },
+  });
+
   const selectedDetail = detailQuery.data;
   const statusOptions = useMemo(
     () => (selectedDetail ? getAvailableStatusOptions(selectedDetail.post.status) : []),
@@ -325,8 +378,20 @@ export function PostsPage() {
           isUploading={uploadMutation.isPending}
           isDeletingPost={deletePostMutation.isPending}
           isDeletingMedia={deleteMediaMutation.isPending}
+          isExporting={exportMutation.isPending}
           onChange={setForm}
           onSave={() => updateMutation.mutate()}
+          onExport={() => exportMutation.mutate()}
+          onCopyText={async (label, text) => {
+            try {
+              await copyTextToClipboard(text);
+              setMessage(`${label} copied.`);
+              setError(null);
+            } catch (copyError) {
+              setError(readError(copyError, 'Could not copy text.'));
+              setMessage(null);
+            }
+          }}
           onUpload={(files) => uploadMutation.mutate(files)}
           onDeleteMedia={(media) => {
             if (window.confirm('Delete this uploaded image?')) {
@@ -407,8 +472,11 @@ function PostEditor({
   isUploading,
   isDeletingPost,
   isDeletingMedia,
+  isExporting,
   onChange,
   onSave,
+  onExport,
+  onCopyText,
   onUpload,
   onDeleteMedia,
   onDeletePost,
@@ -425,8 +493,11 @@ function PostEditor({
   isUploading: boolean;
   isDeletingPost: boolean;
   isDeletingMedia: boolean;
+  isExporting: boolean;
   onChange: (form: PostFormState) => void;
   onSave: () => void;
+  onExport: () => void;
+  onCopyText: (label: string, text: string) => Promise<void> | void;
   onUpload: (files: File[]) => void;
   onDeleteMedia: (media: PostMediaRecord) => void;
   onDeletePost: () => void;
@@ -458,6 +529,13 @@ function PostEditor({
   }
 
   const editorBackground = getFirstOriginalMedia(detail.media);
+  const exportMedia = selectExportMedia(detail.media);
+  const formattedHashtags = formatHashtagsForPost(parseHashtagsInput(form.hashtags));
+  const fullPostText = buildFullPostText({
+    caption: form.caption,
+    hashtags: parseHashtagsInput(form.hashtags),
+  });
+  const isExportable = canExportPost(detail.post.status);
 
   return (
     <Card>
@@ -524,6 +602,18 @@ function PostEditor({
             onChange={(event) => onChange({ ...form, caption: event.target.value })}
             placeholder="Write the post caption."
           />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void onCopyText('Caption', form.caption.trim())}
+              disabled={!form.caption.trim()}
+            >
+              <Copy className="h-4 w-4" aria-hidden="true" />
+              Copy caption
+            </Button>
+          </div>
         </div>
 
         {businessId && (
@@ -544,6 +634,28 @@ function PostEditor({
             onChange={(event) => onChange({ ...form, hashtags: event.target.value })}
             placeholder="#local, #smallbusiness"
           />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void onCopyText('Hashtags', formattedHashtags)}
+              disabled={!formattedHashtags}
+            >
+              <Copy className="h-4 w-4" aria-hidden="true" />
+              Copy hashtags
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void onCopyText('Post text', fullPostText)}
+              disabled={!fullPostText}
+            >
+              <Copy className="h-4 w-4" aria-hidden="true" />
+              Copy full post
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -560,7 +672,52 @@ function PostEditor({
           <Button type="button" onClick={onSave} disabled={isSaving}>
             {isSaving ? 'Saving' : 'Save Post'}
           </Button>
+          <Button
+            type="button"
+            variant={isExportable ? 'default' : 'outline'}
+            onClick={onExport}
+            disabled={isExporting}
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            {detail.post.status === 'exported'
+              ? isExporting
+                ? 'Re-exporting'
+                : 'Re-export'
+              : isExporting
+                ? 'Exporting'
+                : 'Export'}
+          </Button>
         </div>
+
+        {detail.post.status === 'exported' && (
+          <div className="space-y-3 rounded-md border border-primary/20 bg-primary/10 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-primary">Exported post</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {detail.post.exportedAt
+                  ? `Exported ${formatDateTime(detail.post.exportedAt)}`
+                  : 'Exported timestamp unavailable'}
+              </p>
+            </div>
+            {exportMedia && (
+              <div className="overflow-hidden rounded-md border border-border bg-muted">
+                <img src={exportMedia.blobUrl} alt="" className="max-h-80 w-full object-contain" />
+              </div>
+            )}
+            <div className="space-y-2 text-sm">
+              <p className="whitespace-pre-wrap">{form.caption || 'No caption saved.'}</p>
+              {formattedHashtags && (
+                <p className="break-words text-muted-foreground">{formattedHashtags}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!isExportable && (
+          <p className="text-sm text-muted-foreground">
+            Approve this post before exporting it for manual posting.
+          </p>
+        )}
 
         <div className="space-y-3 border-t border-border pt-5">
           <div>
@@ -641,6 +798,16 @@ function formatDate(value: string) {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+  }).format(new Date(value));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   }).format(new Date(value));
 }
 
