@@ -6,6 +6,7 @@ import { postMedia } from '../../src/lib/db/schema';
 import {
   assertMediaUploadAuthenticated,
   assertOwnedPostForMediaUpload,
+  getBlobStorageAuth,
   logMediaUploadDiagnostics,
   uploadPostMedia,
 } from '../../src/lib/media/api';
@@ -20,19 +21,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const auth = await requireAuth(req);
-    const form = await parseMultipartFormData(req);
-    const postId = postIdSchema.parse(form.fields.post_id);
-    logMediaUploadDiagnostics('route-reached', {
+    logMediaUploadDiagnostics('route-authenticated', {
       route: 'upload',
-      fileName: form.files.file?.fileName,
-      mimeType: form.files.file?.mimeType,
-      size: form.files.file?.size,
-      postIdPresent: Boolean(form.fields.post_id),
+      authHeaderPresent: Boolean(req.headers.authorization),
+      userIdResolved: Boolean(auth.userId),
+      selectedAuthMode: getBlobStorageAuth().mode,
       hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
       hasOidcToken: Boolean(process.env.VERCEL_OIDC_TOKEN),
       hasBlobStoreId: Boolean(process.env.BLOB_STORE_ID),
     });
-    const { userId, post, business } = await requirePostOwnership(req, postId);
+    const form = await parseMultipartFormData(req);
+    const postId = postIdSchema.parse(form.fields.post_id);
+    logMediaUploadDiagnostics('route-reached', {
+      route: 'upload',
+      filePresent: Boolean(form.files.file),
+      fileName: form.files.file?.fileName,
+      mimeType: form.files.file?.mimeType,
+      size: form.files.file?.size,
+      postIdPresent: Boolean(form.fields.post_id),
+      selectedAuthMode: getBlobStorageAuth().mode,
+      hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+      hasOidcToken: Boolean(process.env.VERCEL_OIDC_TOKEN),
+      hasBlobStoreId: Boolean(process.env.BLOB_STORE_ID),
+    });
+    let ownership: Awaited<ReturnType<typeof requirePostOwnership>>;
+    try {
+      ownership = await requirePostOwnership(req, postId);
+      logMediaUploadDiagnostics('post-ownership', {
+        route: 'upload',
+        postIdPresent: Boolean(postId),
+        postOwnership: 'passed',
+        selectedAuthMode: getBlobStorageAuth().mode,
+        hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+        hasOidcToken: Boolean(process.env.VERCEL_OIDC_TOKEN),
+        hasBlobStoreId: Boolean(process.env.BLOB_STORE_ID),
+      });
+    } catch (error) {
+      logMediaUploadDiagnostics('post-ownership', {
+        route: 'upload',
+        postIdPresent: Boolean(postId),
+        postOwnership: 'failed',
+        selectedAuthMode: getBlobStorageAuth().mode,
+        hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+        hasOidcToken: Boolean(process.env.VERCEL_OIDC_TOKEN),
+        hasBlobStoreId: Boolean(process.env.BLOB_STORE_ID),
+      });
+      throw error;
+    }
+    const { userId, post, business } = ownership;
 
     assertMediaUploadAuthenticated(auth.userId);
     assertMediaUploadAuthenticated(userId);

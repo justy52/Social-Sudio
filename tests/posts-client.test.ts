@@ -277,16 +277,16 @@ test('uploadPostImage posts original image form data without forcing multipart c
 test('local API adapter includes media upload routes before the media key catchall', () => {
   assert.deepEqual(resolveLocalApiRoutePath('/api/media/upload'), {
     modulePath: '/api/media/upload.ts',
-    parseBody: true,
+    parseBody: false,
   });
   assert.deepEqual(resolveLocalApiRoutePath('/api/media/edited'), {
     modulePath: '/api/media/edited.ts',
-    parseBody: true,
+    parseBody: false,
   });
   assert.deepEqual(resolveLocalApiRoutePath('/api/media/businesses%2Fbiz%2Fposts%2Fpost%2Ffile.png'), {
     modulePath: '/api/media/[key].ts',
     params: { key: 'businesses/biz/posts/post/file.png' },
-    parseBody: true,
+    parseBody: false,
   });
 });
 

@@ -199,6 +199,7 @@ test('OIDC credentials are preferred when both Blob auth modes are present', () 
       token: undefined,
       oidcToken: 'oidc-token',
       storeId: 'store_public',
+      mode: 'oidc',
       hasReadWriteToken: true,
       hasOidcToken: true,
       hasBlobStoreId: true,
@@ -218,6 +219,7 @@ test('read-write token remains supported when OIDC credentials are absent', () =
       token: 'blob-token',
       oidcToken: undefined,
       storeId: undefined,
+      mode: 'token',
       hasReadWriteToken: true,
       hasOidcToken: false,
       hasBlobStoreId: false,
@@ -331,6 +333,14 @@ test('blob upload errors are safely classified for local troubleshooting', () =>
   assert.equal(
     buildBlobUploadErrorMessage({
       name: 'Error',
+      message: 'Vercel Blob: OIDC is enabled for this project, but not for the "development" environment.',
+      status: null,
+    }),
+    'Blob upload failed: OIDC is not enabled for local development. Test uploads in Vercel Preview or use a read-write Blob token for local uploads.',
+  );
+  assert.equal(
+    buildBlobUploadErrorMessage({
+      name: 'Error',
       message: 'Invalid request',
       status: 400,
     }),
@@ -385,6 +395,7 @@ test('missing token and OIDC credentials returns a clear error', async () => {
       token: undefined,
       oidcToken: undefined,
       storeId: undefined,
+      mode: 'none',
       hasReadWriteToken: false,
       hasOidcToken: false,
       hasBlobStoreId: false,

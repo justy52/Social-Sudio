@@ -66,6 +66,7 @@ export type CreateMediaRecordInput = {
 };
 
 export type BlobStorageAuthStatus = BlobStorageAuth & {
+  mode: 'oidc' | 'token' | 'none';
   hasReadWriteToken: boolean;
   hasOidcToken: boolean;
   hasBlobStoreId: boolean;
@@ -79,6 +80,7 @@ export function getBlobStorageAuth(env: NodeJS.ProcessEnv = process.env): BlobSt
   const hasOidcCredentials = Boolean(oidcToken && storeId);
 
   return {
+    mode: hasOidcCredentials ? 'oidc' : token ? 'token' : 'none',
     token: hasOidcCredentials ? undefined : token,
     oidcToken,
     storeId,
@@ -200,6 +202,7 @@ export async function uploadPostMedia<TMedia>(input: {
       mimeType: file.mimeType,
       size: file.size,
       postIdPresent: Boolean(input.postId),
+      selectedAuthMode: auth.mode,
       hasBlobToken: auth.hasReadWriteToken,
       hasOidcToken: auth.hasOidcToken,
       hasBlobStoreId: auth.hasBlobStoreId,
@@ -219,6 +222,7 @@ export async function uploadPostMedia<TMedia>(input: {
       mimeType: file.mimeType,
       size: file.size,
       postIdPresent: Boolean(input.postId),
+      selectedAuthMode: auth.mode,
       hasBlobToken: auth.hasReadWriteToken,
       hasOidcToken: auth.hasOidcToken,
       hasBlobStoreId: auth.hasBlobStoreId,
@@ -246,7 +250,12 @@ export function logMediaUploadDiagnostics(
     fileName?: string;
     mimeType?: string;
     size?: number;
+    authHeaderPresent?: boolean;
+    userIdResolved?: boolean;
+    filePresent?: boolean;
     postIdPresent?: boolean;
+    postOwnership?: 'passed' | 'failed';
+    selectedAuthMode?: BlobStorageAuthStatus['mode'];
     hasBlobToken: boolean;
     hasOidcToken?: boolean;
     hasBlobStoreId?: boolean;
@@ -308,6 +317,14 @@ export function buildBlobUploadErrorMessage(error: SafeBlobError) {
 
   if (lowerMessage.includes('this store does not exist') || lowerMessage.includes('store not found')) {
     return 'Blob upload failed: Blob store was not found. Check BLOB_STORE_ID and the Vercel Blob project connection.';
+  }
+
+  if (
+    lowerMessage.includes('oidc') &&
+    lowerMessage.includes('development') &&
+    lowerMessage.includes('not')
+  ) {
+    return 'Blob upload failed: OIDC is not enabled for local development. Test uploads in Vercel Preview or use a read-write Blob token for local uploads.';
   }
 
   if (

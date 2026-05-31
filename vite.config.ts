@@ -90,11 +90,11 @@ export function resolveLocalApiRoutePath(pathname: string) {
   }
 
   if (pathname === '/api/media/upload') {
-    return { modulePath: '/api/media/upload.ts', parseBody: true };
+    return { modulePath: '/api/media/upload.ts', parseBody: false };
   }
 
   if (pathname === '/api/media/edited') {
-    return { modulePath: '/api/media/edited.ts', parseBody: true };
+    return { modulePath: '/api/media/edited.ts', parseBody: false };
   }
 
   const businessMatch = pathname.match(/^\/api\/businesses\/([^/]+)$/);
@@ -120,7 +120,7 @@ export function resolveLocalApiRoutePath(pathname: string) {
     return {
       modulePath: '/api/media/[key].ts',
       params: { key: decodeURIComponent(mediaMatch[1]) },
-      parseBody: true,
+      parseBody: false,
     };
   }
 
