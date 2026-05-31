@@ -9,13 +9,22 @@ const oidcToken = process.env.VERCEL_OIDC_TOKEN;
 const storeId = process.env.BLOB_STORE_ID;
 const pathname = `diagnostics/social-studio-${Date.now()}.txt`;
 const hasOidcCredentials = Boolean(oidcToken && storeId);
-const hasUsableCredentials = Boolean(token || hasOidcCredentials);
+const hasRuntimeBlobConfig = Boolean(storeId);
+const hasUsableCredentials = Boolean(token || hasRuntimeBlobConfig);
+const authMode = hasOidcCredentials
+  ? 'oidc-runtime'
+  : hasRuntimeBlobConfig
+    ? 'sdk-default'
+    : token
+      ? 'token'
+      : 'none';
 
 console.log(
   JSON.stringify({
     blobReadWriteTokenPresent: Boolean(token),
     vercelOidcTokenPresent: Boolean(oidcToken),
     blobStoreIdPresent: Boolean(storeId),
+    authMode,
   }),
 );
 
@@ -27,9 +36,9 @@ if (!hasUsableCredentials) {
     const blob = await put(pathname, Buffer.from('ok'), {
       access: 'public',
       contentType: 'text/plain',
-      ...(!hasOidcCredentials && token ? { token } : {}),
+      ...(authMode === 'token' && token ? { token } : {}),
       ...(hasOidcCredentials && oidcToken ? { oidcToken } : {}),
-      ...(hasOidcCredentials && storeId ? { storeId } : {}),
+      ...(authMode !== 'token' && storeId ? { storeId } : {}),
     });
 
     console.log(
@@ -41,9 +50,9 @@ if (!hasUsableCredentials) {
     );
 
     await del(blob.pathname ?? pathname, {
-      ...(!hasOidcCredentials && token ? { token } : {}),
+      ...(authMode === 'token' && token ? { token } : {}),
       ...(hasOidcCredentials && oidcToken ? { oidcToken } : {}),
-      ...(hasOidcCredentials && storeId ? { storeId } : {}),
+      ...(authMode !== 'token' && storeId ? { storeId } : {}),
     });
     console.log(JSON.stringify({ deleteOk: true }));
   } catch (error) {

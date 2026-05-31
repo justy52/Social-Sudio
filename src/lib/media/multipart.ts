@@ -119,7 +119,7 @@ export function logMultipartDiagnostics(
   req: VercelRequest,
   form?: MultipartFormData,
 ) {
-  if (process.env.NODE_ENV !== 'development') {
+  if (process.env.NODE_ENV !== 'development' && process.env.VERCEL_ENV !== 'preview') {
     return;
   }
 

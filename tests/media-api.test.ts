@@ -242,11 +242,65 @@ test('OIDC credentials are preferred when both Blob auth modes are present', () 
       token: undefined,
       oidcToken: 'oidc-token',
       storeId: 'store_public',
-      mode: 'oidc',
+      mode: 'oidc-runtime',
       hasReadWriteToken: true,
       hasOidcToken: true,
       hasBlobStoreId: true,
       hasUsableCredentials: true,
+    },
+  );
+});
+
+test('Blob store id allows Vercel runtime Blob SDK credentials', async () => {
+  assert.deepEqual(
+    getBlobStorageAuth({
+      BLOB_READ_WRITE_TOKEN: undefined,
+      VERCEL_OIDC_TOKEN: undefined,
+      BLOB_STORE_ID: 'store_public',
+    }),
+    {
+      token: undefined,
+      oidcToken: undefined,
+      storeId: 'store_public',
+      mode: 'sdk-default',
+      hasReadWriteToken: false,
+      hasOidcToken: false,
+      hasBlobStoreId: true,
+      hasUsableCredentials: true,
+    },
+  );
+
+  await withBlobEnv(
+    {
+      BLOB_READ_WRITE_TOKEN: undefined,
+      VERCEL_OIDC_TOKEN: undefined,
+      BLOB_STORE_ID: 'store_public',
+    },
+    async () => {
+      const media = await uploadPostMedia({
+        token: undefined,
+        postId: 'post_1',
+        file: imageFile(),
+        id: 'runtime-id',
+        context: {
+          post: { id: 'post_1', businessId: 'business_1' },
+          business: { id: 'business_1' },
+        },
+        storage: storageMock({
+          async put(pathname, _body, options) {
+            assert.equal(options.token, undefined);
+            assert.equal(options.oidcToken, undefined);
+            assert.equal(options.storeId, 'store_public');
+            return { url: `https://blob.example/${pathname}`, pathname };
+          },
+        }),
+        async createMediaRecord(record) {
+          assert.equal(record.isEdited, false);
+          return { id: 'media_runtime', ...record };
+        },
+      });
+
+      assert.equal(media.id, 'media_runtime');
     },
   );
 });

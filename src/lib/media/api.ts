@@ -66,7 +66,7 @@ export type CreateMediaRecordInput = {
 };
 
 export type BlobStorageAuthStatus = BlobStorageAuth & {
-  mode: 'oidc' | 'token' | 'none';
+  mode: 'oidc-runtime' | 'sdk-default' | 'token' | 'none';
   hasReadWriteToken: boolean;
   hasOidcToken: boolean;
   hasBlobStoreId: boolean;
@@ -78,16 +78,24 @@ export function getBlobStorageAuth(env: NodeJS.ProcessEnv = process.env): BlobSt
   const oidcToken = env.VERCEL_OIDC_TOKEN?.trim() || undefined;
   const storeId = env.BLOB_STORE_ID?.trim() || undefined;
   const hasOidcCredentials = Boolean(oidcToken && storeId);
+  const hasRuntimeBlobConfig = Boolean(storeId);
+  const mode = hasOidcCredentials
+    ? 'oidc-runtime'
+    : hasRuntimeBlobConfig
+      ? 'sdk-default'
+      : token
+        ? 'token'
+        : 'none';
 
   return {
-    mode: hasOidcCredentials ? 'oidc' : token ? 'token' : 'none',
-    token: hasOidcCredentials ? undefined : token,
+    mode,
+    token: mode === 'token' ? token : undefined,
     oidcToken,
     storeId,
     hasReadWriteToken: Boolean(token),
     hasOidcToken: Boolean(oidcToken),
     hasBlobStoreId: Boolean(storeId),
-    hasUsableCredentials: Boolean(token || hasOidcCredentials),
+    hasUsableCredentials: Boolean(token || hasRuntimeBlobConfig),
   };
 }
 
@@ -211,8 +219,8 @@ export async function uploadPostMedia<TMedia>(input: {
     blob = await input.storage.put(blobKey, file.buffer, {
       contentType: file.mimeType,
       token: auth.token,
-      oidcToken: auth.token ? undefined : auth.oidcToken,
-      storeId: auth.token ? undefined : auth.storeId,
+      oidcToken: auth.mode === 'oidc-runtime' ? auth.oidcToken : undefined,
+      storeId: auth.mode === 'token' ? undefined : auth.storeId,
     });
   } catch (error) {
     const safeBlobError = readSafeBlobError(error);
@@ -262,7 +270,7 @@ export function logMediaUploadDiagnostics(
     blobError?: SafeBlobError;
   },
 ) {
-  if (process.env.NODE_ENV !== 'development') {
+  if (process.env.NODE_ENV !== 'development' && process.env.VERCEL_ENV !== 'preview') {
     return;
   }
 
@@ -363,8 +371,8 @@ export async function deletePostMedia(input: {
   try {
     await input.storage.del(input.media.blobKey, {
       token: auth.token,
-      oidcToken: auth.token ? undefined : auth.oidcToken,
-      storeId: auth.token ? undefined : auth.storeId,
+      oidcToken: auth.mode === 'oidc-runtime' ? auth.oidcToken : undefined,
+      storeId: auth.mode === 'token' ? undefined : auth.storeId,
     });
   } catch {
     throw new ApiError(502, 'Media delete failed. Please try again.');
