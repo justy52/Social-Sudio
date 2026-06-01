@@ -8,11 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { draftPostAssetStatuses, draftPostMediaTypes } from '@/types';
 import type {
   BusinessProfile,
   ContentIdea,
   ContentIdeaGenerateResponse,
   DraftPost,
+  DraftPostAssetStatus,
+  DraftPostMediaType,
   DraftPostPlatform,
   DraftPostStatus,
 } from '@/types';
@@ -48,6 +51,9 @@ type DraftEditFormState = {
   caption: string;
   hashtags: string;
   tone: string;
+  mediaType: DraftPostMediaType;
+  assetStatus: DraftPostAssetStatus;
+  mediaNotes: string;
 };
 
 type DraftStatusFilter = 'all' | DraftPostStatus;
@@ -104,6 +110,44 @@ const draftStatusStyles: Record<DraftPostStatus, string> = {
   draft: 'border-border bg-muted text-muted-foreground',
   needs_review: 'border-accent/30 bg-accent/10 text-accent',
   approved: 'border-primary/30 bg-primary/10 text-primary',
+};
+
+const mediaTypeLabels: Record<DraftPostMediaType, string> = {
+  photo: 'Photo',
+  video: 'Video',
+  reel: 'Reel',
+  story: 'Story',
+  carousel: 'Carousel',
+  none: 'None',
+};
+
+const mediaTypeOptions = draftPostMediaTypes.map((value) => ({
+  value,
+  label: mediaTypeLabels[value],
+}));
+
+const assetStatusLabels: Record<DraftPostAssetStatus, string> = {
+  needed: 'Needed',
+  ready: 'Ready',
+  attached_later: 'Attach Later',
+  not_needed: 'Not Needed',
+};
+
+const assetStatusOptions = draftPostAssetStatuses.map((value) => ({
+  value,
+  label: assetStatusLabels[value],
+}));
+
+const assetStatusBadgeLabels: Partial<Record<DraftPostAssetStatus, string>> = {
+  needed: 'Asset Needed',
+  ready: 'Asset Ready',
+};
+
+const assetStatusStyles: Record<DraftPostAssetStatus, string> = {
+  needed: 'border-destructive/30 bg-destructive/10 text-destructive',
+  ready: 'border-primary/30 bg-primary/10 text-primary',
+  attached_later: 'border-accent/30 bg-accent/10 text-accent',
+  not_needed: 'border-border bg-muted text-muted-foreground',
 };
 
 const draftStatusFilterOptions: { value: DraftStatusFilter; label: string }[] = [
@@ -280,12 +324,16 @@ export function CaptionTestPage() {
     }
 
     const mediaDescription = form.mediaDescription.trim();
+    const mediaNotes = removeGeneratedContext(mediaDescription);
     const draftPost: DraftPost = {
       id: createDraftId(),
       businessName,
       businessType,
       platform: form.platform,
       ...(mediaDescription ? { mediaDescription } : {}),
+      mediaType: getDefaultMediaTypeForPlatform(form.platform),
+      ...(mediaNotes ? { mediaNotes } : {}),
+      assetStatus: 'needed',
       caption: caption.caption,
       hook: caption.hook,
       hashtags: caption.hashtags,
@@ -321,6 +369,9 @@ export function CaptionTestPage() {
           caption: input.caption.trim(),
           hashtags: parseHashtagsInput(input.hashtags),
           tone: input.tone.trim(),
+          mediaType: input.mediaType,
+          assetStatus: input.assetStatus,
+          mediaNotes: input.mediaNotes.trim() || undefined,
           status: draftPost.status === 'approved' ? 'needs_review' : draftPost.status,
         };
       }),
@@ -1149,6 +1200,10 @@ function DraftReviewCard({
   const [editError, setEditError] = useState<string | null>(null);
   const [wasSaved, setWasSaved] = useState(false);
   const isApproved = draftPost.status === 'approved';
+  const mediaType = getDraftMediaType(draftPost);
+  const assetStatus = getDraftAssetStatus(draftPost);
+  const mediaNotes = getDraftMediaNotes(draftPost);
+  const assetBadgeLabel = assetStatusBadgeLabels[assetStatus];
 
   function handleStartEdit() {
     setEditForm(buildDraftEditFormState(draftPost));
@@ -1186,14 +1241,21 @@ function DraftReviewCard({
               {draftPost.businessName} - {formatPlatform(draftPost.platform)}
             </CardDescription>
           </div>
-          <Badge className={getStatusBadgeClassName(draftPost.status)}>
-            {draftStatusLabels[draftPost.status]}
-          </Badge>
-          {isApproved && (
-            <Badge className="border-primary/30 bg-primary/10 text-primary">
-              Export Ready
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <Badge className={getStatusBadgeClassName(draftPost.status)}>
+              {draftStatusLabels[draftPost.status]}
             </Badge>
-          )}
+            {assetBadgeLabel && (
+              <Badge className={getAssetStatusBadgeClassName(assetStatus)}>
+                {assetBadgeLabel}
+              </Badge>
+            )}
+            {isApproved && (
+              <Badge className="border-primary/30 bg-primary/10 text-primary">
+                Export Ready
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
 
@@ -1201,14 +1263,16 @@ function DraftReviewCard({
         <div className="grid gap-3 sm:grid-cols-2">
           <MetadataBlock label="Business type" value={draftPost.businessType} />
           <MetadataBlock label="Tone" value={draftPost.tone} />
+          <MetadataBlock label="Media type" value={mediaTypeLabels[mediaType]} />
+          <MetadataBlock label="Asset status" value={assetStatusLabels[assetStatus]} />
         </div>
 
-        {draftPost.mediaDescription && (
-          <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
-            <p className="text-xs font-medium uppercase text-muted-foreground">Media</p>
-            <p className="mt-1 text-sm text-muted-foreground">{draftPost.mediaDescription}</p>
-          </div>
-        )}
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+          <p className="text-xs font-medium uppercase text-muted-foreground">Media Notes</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+            {mediaNotes || 'No media notes added yet.'}
+          </p>
+        </div>
 
         {isEditing ? (
           <div className="space-y-4 rounded-md border border-border bg-muted/30 p-4">
@@ -1254,6 +1318,59 @@ function DraftReviewCard({
                 value={editForm.hashtags}
                 onChange={(event) =>
                   setEditForm({ ...editForm, hashtags: event.target.value })
+                }
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`draft-media-type-${draftPost.id}`}>Media Type</Label>
+                <Select
+                  id={`draft-media-type-${draftPost.id}`}
+                  value={editForm.mediaType}
+                  onChange={(event) =>
+                    setEditForm({
+                      ...editForm,
+                      mediaType: event.target.value as DraftPostMediaType,
+                    })
+                  }
+                >
+                  {mediaTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor={`draft-asset-status-${draftPost.id}`}>Asset Status</Label>
+                <Select
+                  id={`draft-asset-status-${draftPost.id}`}
+                  value={editForm.assetStatus}
+                  onChange={(event) =>
+                    setEditForm({
+                      ...editForm,
+                      assetStatus: event.target.value as DraftPostAssetStatus,
+                    })
+                  }
+                >
+                  {assetStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`draft-media-notes-${draftPost.id}`}>Media Notes</Label>
+              <Textarea
+                id={`draft-media-notes-${draftPost.id}`}
+                value={editForm.mediaNotes}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, mediaNotes: event.target.value })
                 }
               />
             </div>
@@ -1566,12 +1683,26 @@ function readError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
+function normalizeDraftPost(draftPost: DraftPost): DraftPost {
+  const mediaNotes = getDraftMediaNotes(draftPost);
+
+  return {
+    ...draftPost,
+    mediaType: getDraftMediaType(draftPost),
+    assetStatus: getDraftAssetStatus(draftPost),
+    mediaNotes: mediaNotes || undefined,
+  };
+}
+
 function buildDraftEditFormState(draftPost: DraftPost): DraftEditFormState {
   return {
     hook: draftPost.hook,
     caption: draftPost.caption,
     hashtags: draftPost.hashtags.join(' '),
     tone: draftPost.tone,
+    mediaType: getDraftMediaType(draftPost),
+    assetStatus: getDraftAssetStatus(draftPost),
+    mediaNotes: getDraftMediaNotes(draftPost),
   };
 }
 
@@ -1581,6 +1712,22 @@ function parseHashtagsInput(value: string) {
     .map((hashtag) => hashtag.trim())
     .filter(Boolean)
     .map((hashtag) => (hashtag.startsWith('#') ? hashtag : `#${hashtag}`));
+}
+
+function getDefaultMediaTypeForPlatform(platform: DraftPostPlatform): DraftPostMediaType {
+  return platform === 'instagram' || platform === 'tiktok' ? 'reel' : 'photo';
+}
+
+function getDraftMediaType(draftPost: DraftPost): DraftPostMediaType {
+  return draftPost.mediaType ?? 'none';
+}
+
+function getDraftAssetStatus(draftPost: DraftPost): DraftPostAssetStatus {
+  return draftPost.assetStatus ?? 'needed';
+}
+
+function getDraftMediaNotes(draftPost: DraftPost) {
+  return draftPost.mediaNotes?.trim() || removeGeneratedContext(draftPost.mediaDescription ?? '');
 }
 
 function getVisibleDraftPosts(
@@ -1617,8 +1764,11 @@ function getDraftCreatedTime(draftPost: DraftPost) {
 }
 
 function buildManualExportText(draftPost: DraftPost) {
+  const mediaNotes = getDraftMediaNotes(draftPost);
+
   return [
     `Platform: ${formatPlatform(draftPost.platform)}`,
+    mediaNotes ? `Media notes: ${mediaNotes}` : '',
     draftPost.caption.trim(),
     draftPost.hashtags.join(' ').trim(),
   ]
@@ -1646,10 +1796,14 @@ function downloadDraftTextFile(draftPost: DraftPost) {
 }
 
 function buildDraftTextFileContent(draftPost: DraftPost) {
+  const mediaNotes = getDraftMediaNotes(draftPost);
+
   return [
     `Business name: ${draftPost.businessName}`,
     `Platform: ${formatPlatform(draftPost.platform)}`,
     `Status: ${draftStatusLabels[draftPost.status]}`,
+    `Media type: ${mediaTypeLabels[getDraftMediaType(draftPost)]}`,
+    `Asset status: ${assetStatusLabels[getDraftAssetStatus(draftPost)]}`,
     `Hook: ${draftPost.hook || 'Not set'}`,
     '',
     'Caption:',
@@ -1657,6 +1811,9 @@ function buildDraftTextFileContent(draftPost: DraftPost) {
     '',
     'Hashtags:',
     draftPost.hashtags.join(' ') || 'Not set',
+    '',
+    'Media notes:',
+    mediaNotes || 'Not set',
     '',
     `Tone: ${draftPost.tone || 'Not set'}`,
     `Created date: ${formatExportDate(draftPost.createdAt)}`,
@@ -1697,7 +1854,7 @@ function loadStoredDraftPosts() {
   const storedValue = getLocalStorageJson(storageKeys.draftPosts);
 
   if (isDraftPostArray(storedValue)) {
-    return storedValue;
+    return storedValue.map(normalizeDraftPost);
   }
 
   if (storedValue !== null) {
@@ -1803,6 +1960,9 @@ function isDraftPost(value: unknown): value is DraftPost {
     typeof value.businessType === 'string' &&
     isDraftPostPlatform(value.platform) &&
     (value.mediaDescription === undefined || typeof value.mediaDescription === 'string') &&
+    (value.mediaType === undefined || isDraftPostMediaType(value.mediaType)) &&
+    (value.mediaNotes === undefined || typeof value.mediaNotes === 'string') &&
+    (value.assetStatus === undefined || isDraftPostAssetStatus(value.assetStatus)) &&
     typeof value.caption === 'string' &&
     typeof value.hook === 'string' &&
     Array.isArray(value.hashtags) &&
@@ -1819,6 +1979,14 @@ function isDraftPostPlatform(value: unknown): value is DraftPostPlatform {
 
 function isDraftPostStatus(value: unknown): value is DraftPostStatus {
   return draftStatusOptions.some((option) => option.value === value);
+}
+
+function isDraftPostMediaType(value: unknown): value is DraftPostMediaType {
+  return mediaTypeOptions.some((option) => option.value === value);
+}
+
+function isDraftPostAssetStatus(value: unknown): value is DraftPostAssetStatus {
+  return assetStatusOptions.some((option) => option.value === value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1982,4 +2150,8 @@ function getDraftCardClassName(status: DraftPostStatus) {
 
 function getStatusBadgeClassName(status: DraftPostStatus) {
   return cn('font-semibold', draftStatusStyles[status]);
+}
+
+function getAssetStatusBadgeClassName(status: DraftPostAssetStatus) {
+  return cn('font-semibold', assetStatusStyles[status]);
 }

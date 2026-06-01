@@ -32,6 +32,14 @@ export type DraftPostPlatform = (typeof draftPostPlatforms)[number];
 
 export type DraftPostStatus = 'draft' | 'needs_review' | 'approved';
 
+export const draftPostMediaTypes = ['photo', 'video', 'reel', 'story', 'carousel', 'none'] as const;
+
+export type DraftPostMediaType = (typeof draftPostMediaTypes)[number];
+
+export const draftPostAssetStatuses = ['needed', 'ready', 'attached_later', 'not_needed'] as const;
+
+export type DraftPostAssetStatus = (typeof draftPostAssetStatuses)[number];
+
 export type BusinessProfile = {
   id: string;
   businessName: string;
@@ -52,6 +60,9 @@ export type DraftPost = {
   businessType: string;
   platform: DraftPostPlatform;
   mediaDescription?: string;
+  mediaType?: DraftPostMediaType;
+  mediaNotes?: string;
+  assetStatus?: DraftPostAssetStatus;
   caption: string;
   hook: string;
   hashtags: string[];
