@@ -4,6 +4,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { LoadingState } from '@/components/ui/loading';
 import { BusinessProvider } from '@/context/business-context';
 import { CalendarPage } from '@/pages/calendar';
+import { CaptionTestPage } from '@/pages/caption-test';
 import { DashboardPage } from '@/pages/dashboard';
 import { NotFoundPage } from '@/pages/not-found';
 import { PostsPage } from '@/pages/posts';
@@ -16,6 +17,7 @@ export function App() {
     <Routes>
       <Route path="/sign-in/*" element={<SignInPage />} />
       <Route path="/sign-up/*" element={<SignUpPage />} />
+      <Route path="/caption-test" element={<ProtectedCaptionTest />} />
       <Route element={<ProtectedApp />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
@@ -26,6 +28,20 @@ export function App() {
       </Route>
     </Routes>
   );
+}
+
+function ProtectedCaptionTest() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return <LoadingState label="Checking your session" />;
+  }
+
+  if (!isSignedIn) {
+    return <RedirectToSignIn />;
+  }
+
+  return <CaptionTestPage />;
 }
 
 function ProtectedApp() {
