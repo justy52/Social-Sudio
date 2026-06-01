@@ -36,6 +36,13 @@ type DraftSummary = {
   approved: number;
 };
 
+type DraftEditFormState = {
+  hook: string;
+  caption: string;
+  hashtags: string;
+  tone: string;
+};
+
 type BusinessProfileTextField =
   | 'businessName'
   | 'businessType'
@@ -99,6 +106,7 @@ export function CaptionTestPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [savedIndex, setSavedIndex] = useState<number | null>(null);
+  const [copiedDraftId, setCopiedDraftId] = useState<string | null>(null);
   const [draftPosts, setDraftPosts] = useState<DraftPost[]>(() => loadStoredDraftPosts());
 
   useEffect(() => {
@@ -215,10 +223,44 @@ export function CaptionTestPage() {
     );
   }
 
+  function handleDraftUpdate(draftId: string, input: DraftEditFormState) {
+    setDraftPosts((currentDrafts) =>
+      currentDrafts.map((draftPost) => {
+        if (draftPost.id !== draftId) {
+          return draftPost;
+        }
+
+        return {
+          ...draftPost,
+          hook: input.hook.trim(),
+          caption: input.caption.trim(),
+          hashtags: parseHashtagsInput(input.hashtags),
+          tone: input.tone.trim(),
+          status: draftPost.status === 'approved' ? 'needs_review' : draftPost.status,
+        };
+      }),
+    );
+  }
+
   function handleRemoveDraft(draftId: string) {
     setDraftPosts((currentDrafts) =>
       currentDrafts.filter((draftPost) => draftPost.id !== draftId),
     );
+  }
+
+  async function handleCopyDraft(draftPost: DraftPost) {
+    const draftText = [draftPost.caption, draftPost.hashtags.join(' ')]
+      .filter(Boolean)
+      .join('\n\n');
+
+    try {
+      await navigator.clipboard.writeText(draftText);
+      setCopiedDraftId(draftPost.id);
+      setError(null);
+      window.setTimeout(() => setCopiedDraftId(null), 1800);
+    } catch (copyError) {
+      setError(readError(copyError, 'Could not copy this draft.'));
+    }
   }
 
   function handleClearDrafts() {
@@ -297,11 +339,14 @@ export function CaptionTestPage() {
         </div>
 
         <TemporaryDraftReview
+          copiedDraftId={copiedDraftId}
           draftPosts={draftPosts}
           summary={draftSummary}
           onClearAll={handleClearDrafts}
+          onCopyDraft={handleCopyDraft}
           onRemove={handleRemoveDraft}
           onStatusChange={handleDraftStatusChange}
+          onUpdateDraft={handleDraftUpdate}
         />
       </div>
     </main>
@@ -692,17 +737,23 @@ function GeneratedCaptionOptions({
 }
 
 function TemporaryDraftReview({
+  copiedDraftId,
   draftPosts,
   summary,
   onClearAll,
+  onCopyDraft,
   onRemove,
   onStatusChange,
+  onUpdateDraft,
 }: {
+  copiedDraftId: string | null;
   draftPosts: DraftPost[];
   summary: DraftSummary;
   onClearAll: () => void;
+  onCopyDraft: (draftPost: DraftPost) => Promise<void>;
   onRemove: (draftId: string) => void;
   onStatusChange: (draftId: string, status: DraftPostStatus) => void;
+  onUpdateDraft: (draftId: string, input: DraftEditFormState) => void;
 }) {
   return (
     <section className="space-y-4">
@@ -737,9 +788,12 @@ function TemporaryDraftReview({
           {draftPosts.map((draftPost) => (
             <DraftReviewCard
               key={draftPost.id}
+              copiedDraftId={copiedDraftId}
               draftPost={draftPost}
+              onCopyDraft={onCopyDraft}
               onRemove={onRemove}
               onStatusChange={onStatusChange}
+              onUpdateDraft={onUpdateDraft}
             />
           ))}
         </div>
@@ -749,14 +803,53 @@ function TemporaryDraftReview({
 }
 
 function DraftReviewCard({
+  copiedDraftId,
   draftPost,
+  onCopyDraft,
   onRemove,
   onStatusChange,
+  onUpdateDraft,
 }: {
+  copiedDraftId: string | null;
   draftPost: DraftPost;
+  onCopyDraft: (draftPost: DraftPost) => Promise<void>;
   onRemove: (draftId: string) => void;
   onStatusChange: (draftId: string, status: DraftPostStatus) => void;
+  onUpdateDraft: (draftId: string, input: DraftEditFormState) => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<DraftEditFormState>(() =>
+    buildDraftEditFormState(draftPost),
+  );
+  const [editError, setEditError] = useState<string | null>(null);
+  const [wasSaved, setWasSaved] = useState(false);
+
+  function handleStartEdit() {
+    setEditForm(buildDraftEditFormState(draftPost));
+    setEditError(null);
+    setWasSaved(false);
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    setEditForm(buildDraftEditFormState(draftPost));
+    setEditError(null);
+    setIsEditing(false);
+  }
+
+  function handleSaveEdit() {
+    if (!editForm.caption.trim()) {
+      setEditError('Caption is required before saving changes.');
+      return;
+    }
+
+    onUpdateDraft(draftPost.id, editForm);
+    setEditError(null);
+    setIsEditing(false);
+    setWasSaved(true);
+    window.setTimeout(() => setWasSaved(false), 1800);
+  }
+
   return (
     <Card className={cn('overflow-hidden', getDraftCardClassName(draftPost.status))}>
       <CardHeader>
@@ -786,23 +879,112 @@ function DraftReviewCard({
           </div>
         )}
 
-        <div className="space-y-2">
-          <p className="whitespace-pre-wrap text-sm leading-6">{draftPost.caption}</p>
-          {draftPost.hashtags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {draftPost.hashtags.map((hashtag) => (
-                <span
-                  key={hashtag}
-                  className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
-                >
-                  {hashtag}
-                </span>
-              ))}
+        {isEditing ? (
+          <div className="space-y-4 rounded-md border border-border bg-muted/30 p-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`draft-hook-${draftPost.id}`}>Hook</Label>
+                <Input
+                  id={`draft-hook-${draftPost.id}`}
+                  value={editForm.hook}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, hook: event.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor={`draft-tone-${draftPost.id}`}>Tone</Label>
+                <Input
+                  id={`draft-tone-${draftPost.id}`}
+                  value={editForm.tone}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, tone: event.target.value })
+                  }
+                />
+              </div>
             </div>
-          )}
-        </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`draft-caption-${draftPost.id}`}>Caption</Label>
+              <Textarea
+                id={`draft-caption-${draftPost.id}`}
+                value={editForm.caption}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, caption: event.target.value })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`draft-hashtags-${draftPost.id}`}>Hashtags</Label>
+              <Textarea
+                id={`draft-hashtags-${draftPost.id}`}
+                value={editForm.hashtags}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, hashtags: event.target.value })
+                }
+              />
+            </div>
+
+            {editError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {editError}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={handleSaveEdit}>
+                <Check className="h-4 w-4" aria-hidden="true" />
+                Save Changes
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="whitespace-pre-wrap text-sm leading-6">{draftPost.caption}</p>
+            {draftPost.hashtags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {draftPost.hashtags.map((hashtag) => (
+                  <span
+                    key={hashtag}
+                    className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
+                  >
+                    {hashtag}
+                  </span>
+                ))}
+              </div>
+            )}
+            {wasSaved && (
+              <p className="text-sm font-medium text-primary">Changes saved.</p>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
+          {!isEditing && (
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={handleStartEdit}>
+                Edit Draft
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void onCopyDraft(draftPost)}
+              >
+                {copiedDraftId === draftPost.id ? (
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Copy className="h-4 w-4" aria-hidden="true" />
+                )}
+                {copiedDraftId === draftPost.id ? 'Copied' : 'Copy Draft'}
+              </Button>
+            </>
+          )}
           {draftStatusOptions.map((option) => {
             const isCurrentStatus = option.value === draftPost.status;
 
@@ -929,6 +1111,23 @@ function parseApiError(responseText: string, status: number) {
 
 function readError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function buildDraftEditFormState(draftPost: DraftPost): DraftEditFormState {
+  return {
+    hook: draftPost.hook,
+    caption: draftPost.caption,
+    hashtags: draftPost.hashtags.join(' '),
+    tone: draftPost.tone,
+  };
+}
+
+function parseHashtagsInput(value: string) {
+  return value
+    .split(/\s+/)
+    .map((hashtag) => hashtag.trim())
+    .filter(Boolean)
+    .map((hashtag) => (hashtag.startsWith('#') ? hashtag : `#${hashtag}`));
 }
 
 function loadStoredBusinessProfile() {
