@@ -1,12 +1,14 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const prototypeNavigation = [
   { name: 'Home', href: '/' },
-  { name: 'Caption Studio', href: '/studio' },
+  { name: 'Caption Studio', href: '/studio', aliases: ['/caption-test'] },
 ];
 
 export function PrototypeNav() {
+  const location = useLocation();
+
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
@@ -23,7 +25,7 @@ export function PrototypeNav() {
               className={({ isActive }) =>
                 cn(
                   'rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
+                  isActive || item.aliases?.includes(location.pathname)
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )

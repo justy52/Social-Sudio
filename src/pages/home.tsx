@@ -36,6 +36,9 @@ export function HomePage() {
           <Button asChild>
             <Link to="/studio">Open Caption Studio</Link>
           </Button>
+          <p className="text-xs text-muted-foreground">
+            Opening Caption Studio uses the existing sign-in gate for this prototype.
+          </p>
         </section>
 
         <section className="space-y-3">

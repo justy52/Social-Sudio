@@ -65,8 +65,8 @@ export function BusinessSetupForm() {
           </div>
           <CardTitle>Set up your first business</CardTitle>
           <CardDescription>
-            Add the basic brand details Social Studio will use for future captions and image
-            exports.
+            Add the basic brand details Social Studio will use for future captions, draft
+            review, and manual exports.
           </CardDescription>
         </CardHeader>
         <CardContent>
