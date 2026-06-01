@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Check, Copy, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Copy, Download, Sparkles, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,6 +91,15 @@ const draftStatusStyles: Record<DraftPostStatus, string> = {
   approved: 'border-primary/30 bg-primary/10 text-primary',
 };
 
+const manualPostingChecklist = [
+  'Copy caption',
+  'Save/download text',
+  'Open social app',
+  'Paste caption',
+  'Attach media manually',
+  'Review and publish',
+];
+
 const storageKeys = {
   businessProfile: 'socialStudio.businessProfile.v1',
   draftPosts: 'socialStudio.draftPosts.v1',
@@ -107,6 +116,7 @@ export function CaptionTestPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [savedIndex, setSavedIndex] = useState<number | null>(null);
   const [copiedDraftId, setCopiedDraftId] = useState<string | null>(null);
+  const [copiedExportDraftId, setCopiedExportDraftId] = useState<string | null>(null);
   const [draftPosts, setDraftPosts] = useState<DraftPost[]>(() => loadStoredDraftPosts());
 
   useEffect(() => {
@@ -263,6 +273,17 @@ export function CaptionTestPage() {
     }
   }
 
+  async function handleCopyExportText(draftPost: DraftPost) {
+    try {
+      await navigator.clipboard.writeText(buildManualExportText(draftPost));
+      setCopiedExportDraftId(draftPost.id);
+      setError(null);
+      window.setTimeout(() => setCopiedExportDraftId(null), 1800);
+    } catch (copyError) {
+      setError(readError(copyError, 'Could not copy export text.'));
+    }
+  }
+
   function handleClearDrafts() {
     if (window.confirm('Clear all temporary drafts?')) {
       removeLocalStorageItem(storageKeys.draftPosts);
@@ -340,10 +361,12 @@ export function CaptionTestPage() {
 
         <TemporaryDraftReview
           copiedDraftId={copiedDraftId}
+          copiedExportDraftId={copiedExportDraftId}
           draftPosts={draftPosts}
           summary={draftSummary}
           onClearAll={handleClearDrafts}
           onCopyDraft={handleCopyDraft}
+          onCopyExportText={handleCopyExportText}
           onRemove={handleRemoveDraft}
           onStatusChange={handleDraftStatusChange}
           onUpdateDraft={handleDraftUpdate}
@@ -738,19 +761,23 @@ function GeneratedCaptionOptions({
 
 function TemporaryDraftReview({
   copiedDraftId,
+  copiedExportDraftId,
   draftPosts,
   summary,
   onClearAll,
   onCopyDraft,
+  onCopyExportText,
   onRemove,
   onStatusChange,
   onUpdateDraft,
 }: {
   copiedDraftId: string | null;
+  copiedExportDraftId: string | null;
   draftPosts: DraftPost[];
   summary: DraftSummary;
   onClearAll: () => void;
   onCopyDraft: (draftPost: DraftPost) => Promise<void>;
+  onCopyExportText: (draftPost: DraftPost) => Promise<void>;
   onRemove: (draftId: string) => void;
   onStatusChange: (draftId: string, status: DraftPostStatus) => void;
   onUpdateDraft: (draftId: string, input: DraftEditFormState) => void;
@@ -789,8 +816,10 @@ function TemporaryDraftReview({
             <DraftReviewCard
               key={draftPost.id}
               copiedDraftId={copiedDraftId}
+              copiedExportDraftId={copiedExportDraftId}
               draftPost={draftPost}
               onCopyDraft={onCopyDraft}
+              onCopyExportText={onCopyExportText}
               onRemove={onRemove}
               onStatusChange={onStatusChange}
               onUpdateDraft={onUpdateDraft}
@@ -804,15 +833,19 @@ function TemporaryDraftReview({
 
 function DraftReviewCard({
   copiedDraftId,
+  copiedExportDraftId,
   draftPost,
   onCopyDraft,
+  onCopyExportText,
   onRemove,
   onStatusChange,
   onUpdateDraft,
 }: {
   copiedDraftId: string | null;
+  copiedExportDraftId: string | null;
   draftPost: DraftPost;
   onCopyDraft: (draftPost: DraftPost) => Promise<void>;
+  onCopyExportText: (draftPost: DraftPost) => Promise<void>;
   onRemove: (draftId: string) => void;
   onStatusChange: (draftId: string, status: DraftPostStatus) => void;
   onUpdateDraft: (draftId: string, input: DraftEditFormState) => void;
@@ -823,6 +856,7 @@ function DraftReviewCard({
   );
   const [editError, setEditError] = useState<string | null>(null);
   const [wasSaved, setWasSaved] = useState(false);
+  const isApproved = draftPost.status === 'approved';
 
   function handleStartEdit() {
     setEditForm(buildDraftEditFormState(draftPost));
@@ -863,6 +897,11 @@ function DraftReviewCard({
           <Badge className={getStatusBadgeClassName(draftPost.status)}>
             {draftStatusLabels[draftPost.status]}
           </Badge>
+          {isApproved && (
+            <Badge className="border-primary/30 bg-primary/10 text-primary">
+              Export Ready
+            </Badge>
+          )}
         </div>
       </CardHeader>
 
@@ -1015,8 +1054,87 @@ function DraftReviewCard({
         <p className="text-xs text-muted-foreground">
           Created {formatDraftDate(draftPost.createdAt)}
         </p>
+
+        <ManualExportPanel
+          copiedExportDraftId={copiedExportDraftId}
+          draftPost={draftPost}
+          isApproved={isApproved}
+          onCopyExportText={onCopyExportText}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+function ManualExportPanel({
+  copiedExportDraftId,
+  draftPost,
+  isApproved,
+  onCopyExportText,
+}: {
+  copiedExportDraftId: string | null;
+  draftPost: DraftPost;
+  isApproved: boolean;
+  onCopyExportText: (draftPost: DraftPost) => Promise<void>;
+}) {
+  if (!isApproved) {
+    return (
+      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+        Approve this draft before export.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 rounded-md border border-primary/30 bg-primary/10 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-primary">Export for Manual Posting</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Copy or download the approved text, then post it manually.
+          </p>
+        </div>
+        <Badge className="border-primary/30 bg-background text-primary">Export Ready</Badge>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void onCopyExportText(draftPost)}
+        >
+          {copiedExportDraftId === draftPost.id ? (
+            <Check className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Copy className="h-4 w-4" aria-hidden="true" />
+          )}
+          {copiedExportDraftId === draftPost.id ? 'Copied' : 'Copy Export Text'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => downloadDraftTextFile(draftPost)}
+        >
+          <Download className="h-4 w-4" aria-hidden="true" />
+          Download .txt
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase text-muted-foreground">
+          Manual Posting Checklist
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {manualPostingChecklist.map((item) => (
+            <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Check className="h-4 w-4 text-primary" aria-hidden="true" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1128,6 +1246,69 @@ function parseHashtagsInput(value: string) {
     .map((hashtag) => hashtag.trim())
     .filter(Boolean)
     .map((hashtag) => (hashtag.startsWith('#') ? hashtag : `#${hashtag}`));
+}
+
+function buildManualExportText(draftPost: DraftPost) {
+  return [
+    `Platform: ${formatPlatform(draftPost.platform)}`,
+    draftPost.caption.trim(),
+    draftPost.hashtags.join(' ').trim(),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function downloadDraftTextFile(draftPost: DraftPost) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const blob = new Blob([buildDraftTextFileContent(draftPost)], {
+    type: 'text/plain;charset=utf-8',
+  });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = objectUrl;
+  link.download = buildDraftFileName(draftPost);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+}
+
+function buildDraftTextFileContent(draftPost: DraftPost) {
+  return [
+    `Business name: ${draftPost.businessName}`,
+    `Platform: ${formatPlatform(draftPost.platform)}`,
+    `Status: ${draftStatusLabels[draftPost.status]}`,
+    `Hook: ${draftPost.hook || 'Not set'}`,
+    '',
+    'Caption:',
+    draftPost.caption,
+    '',
+    'Hashtags:',
+    draftPost.hashtags.join(' ') || 'Not set',
+    '',
+    `Tone: ${draftPost.tone || 'Not set'}`,
+    `Created date: ${formatExportDate(draftPost.createdAt)}`,
+    `Exported date: ${formatExportDate(new Date().toISOString())}`,
+  ].join('\n');
+}
+
+function buildDraftFileName(draftPost: DraftPost) {
+  const businessName = slugifyFilePart(draftPost.businessName) || 'business';
+
+  return `${businessName}-${draftPost.platform}-draft.txt`;
+}
+
+function slugifyFilePart(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
 }
 
 function loadStoredBusinessProfile() {
@@ -1358,6 +1539,16 @@ function formatDraftDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatExportDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value));
