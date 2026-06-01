@@ -209,8 +209,12 @@ export function CaptionTestPage() {
       ...currentForm,
       businessName: businessProfile.businessName,
       businessType: businessProfile.businessType,
-      brandVoice: buildBrandVoiceContext(businessProfile),
+      brandVoice: businessProfile.brandVoice,
       postGoal: businessProfile.primaryOffer,
+      mediaDescription: buildMediaDescriptionContext(
+        currentForm.mediaDescription,
+        businessProfile,
+      ),
       platform: businessProfile.defaultPlatform,
     }));
     setError(null);
@@ -438,7 +442,7 @@ function CaptionInputs({
     <section className="space-y-3">
       <SectionHeading
         title="Caption Inputs"
-        description="Business context, post goal, media notes, and destination platform."
+        description="Post goal, media notes, profile context, and destination platform."
       />
 
       <Card>
@@ -504,7 +508,7 @@ function CaptionInputs({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="media-description">Media Description</Label>
+              <Label htmlFor="media-description">Media Description / Context</Label>
               <Textarea
                 id="media-description"
                 value={form.mediaDescription}
@@ -886,6 +890,37 @@ function readError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
+function buildMediaDescriptionContext(
+  currentMediaDescription: string,
+  profile: BusinessProfile,
+) {
+  const mediaDescription = removeProfileContext(currentMediaDescription);
+  const profileContext = [
+    profile.targetAudience.trim() ? `Audience: ${profile.targetAudience.trim()}` : '',
+    profile.coreServices.trim() ? `Core services: ${profile.coreServices.trim()}` : '',
+    profile.contentStyle.trim() ? `Content style: ${profile.contentStyle.trim()}` : '',
+    profile.notes?.trim() ? `Notes: ${profile.notes.trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  if (!profileContext) {
+    return mediaDescription;
+  }
+
+  return [mediaDescription, `Profile context:\n${profileContext}`].filter(Boolean).join('\n\n');
+}
+
+function removeProfileContext(value: string) {
+  const markerIndex = value.indexOf('Profile context:');
+
+  if (markerIndex === -1) {
+    return value.trim();
+  }
+
+  return value.slice(0, markerIndex).trim();
+}
+
 function createDefaultBusinessProfile(): BusinessProfile {
   return {
     id: 'iron-backs-gym-profile',
@@ -902,18 +937,6 @@ function createDefaultBusinessProfile(): BusinessProfile {
     notes: 'Avoid CrossFit terminology. Emphasize functional fitness, strength, grit, and community.',
     updatedAt: new Date().toISOString(),
   };
-}
-
-function buildBrandVoiceContext(profile: BusinessProfile) {
-  return [
-    profile.brandVoice.trim(),
-    profile.targetAudience.trim() ? `Target audience: ${profile.targetAudience.trim()}` : '',
-    profile.coreServices.trim() ? `Core services: ${profile.coreServices.trim()}` : '',
-    profile.contentStyle.trim() ? `Content style: ${profile.contentStyle.trim()}` : '',
-    profile.notes?.trim() ? `Notes: ${profile.notes.trim()}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
 }
 
 function createDraftId() {
