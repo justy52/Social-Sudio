@@ -58,8 +58,11 @@ CLERK_SECRET_KEY=
 CLERK_WEBHOOK_SECRET=
 OPENAI_API_KEY=
 BLOB_STORE_ID=
-BLOB_WEBHOOK_PUBLIC_KEY=
+# Optional local/token fallback for Blob uploads:
+BLOB_READ_WRITE_TOKEN=
 ```
+
+For Vercel Preview/Production, connect Vercel Blob and set `BLOB_STORE_ID` so the runtime can use Blob/OIDC access. `BLOB_READ_WRITE_TOKEN` is optional for local or token-based Blob access. `BLOB_WEBHOOK_PUBLIC_KEY` is not required for the current MVP.
 
 3. Generate and apply the database migration:
 
@@ -82,6 +85,6 @@ npx vercel dev --listen 5173
 
 ## Deployment Notes
 
-Deploy to Vercel as a Vite app with build command `corepack pnpm build` and output directory `dist`. Add the required environment variables above in Vercel. The `vercel.json` rewrite keeps SPA routes working while preserving root `/api/*` serverless functions.
+Deploy to Vercel as a Vite app with build command `corepack pnpm build` and output directory `dist`. Add the required environment variables above in Vercel, including `BLOB_STORE_ID` for connected Blob runtime/OIDC access. The `vercel.json` rewrite keeps SPA routes working while preserving root `/api/*` serverless functions.
 
 Resend email reminders are optional Phase 3.5+ only. Do not add cron, Stripe, Meta publishing, market intelligence, or ad campaign features during Phase 3.

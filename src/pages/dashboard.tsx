@@ -1,23 +1,23 @@
-import { Building2, CheckCircle2, ImagePlus, ShieldCheck } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Download, ImagePlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBusinessContext } from '@/context/business-context';
 
-const foundationItems = [
+const workflowItems = [
   {
-    title: 'Business profile',
-    description: 'Brand voice, colors, industry, and logo placeholder are ready.',
-    icon: Building2,
-  },
-  {
-    title: 'Protected workspace',
-    description: 'Routes sit behind Clerk authentication.',
-    icon: ShieldCheck,
-  },
-  {
-    title: 'Phase 2 entry point',
-    description: 'Image upload and content creation will start after this foundation.',
+    title: 'Create content',
+    description: 'Draft posts, upload and edit images, and generate captions from brand context.',
     icon: ImagePlus,
+  },
+  {
+    title: 'Export or schedule',
+    description: 'Quick Export copies post text and downloads images, or schedule approved posts.',
+    icon: Download,
+  },
+  {
+    title: 'Post manually',
+    description: 'Use the Today checklist to export, copy text, mark posted, and undo if needed.',
+    icon: CalendarDays,
   },
 ];
 
@@ -30,17 +30,17 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-normal">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Foundation workspace for {activeBusiness?.name}.
+            Manual posting workspace for {activeBusiness?.name ?? 'your business'}.
           </p>
         </div>
         <Badge>
           <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-          Phase 1
+          Phase 3 MVP
         </Badge>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {foundationItems.map((item) => {
+        {workflowItems.map((item) => {
           const Icon = item.icon;
 
           return (
@@ -57,17 +57,17 @@ export function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>First useful workflow</CardTitle>
+          <CardTitle>Current MVP workflow</CardTitle>
           <CardDescription>
-            The product path stays focused: business setup, image upload, basic branded edit, AI
-            caption draft, review, approve, and export for manual posting.
+            Social Studio is focused on the daily manual posting loop: create content, prepare
+            the final asset, schedule what is due, and track what has been posted.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-            <div className="rounded-md border border-border p-3">1. Business setup</div>
-            <div className="rounded-md border border-border p-3">2. Content MVP next</div>
-            <div className="rounded-md border border-border p-3">3. Manual posting only</div>
+            <div className="rounded-md border border-border p-3">1. Create and caption posts</div>
+            <div className="rounded-md border border-border p-3">2. Quick export or schedule</div>
+            <div className="rounded-md border border-border p-3">3. Use Today and mark posted</div>
           </div>
         </CardContent>
       </Card>

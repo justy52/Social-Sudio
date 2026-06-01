@@ -29,7 +29,14 @@ git remote add origin https://github.com/YOUR_USERNAME/social-studio.git
 1. Sign up, connect GitHub
 2. Import `social-studio` repo
 3. Build settings: Framework: Vite, Build: `pnpm build`, Output: `dist`
-4. Add all environment variables
+4. Add all required environment variables
+   - `DATABASE_URL`
+   - `VITE_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+   - `CLERK_WEBHOOK_SECRET`
+   - `OPENAI_API_KEY`
+   - `BLOB_STORE_ID` for connected Vercel Blob runtime/OIDC access
+   - `BLOB_READ_WRITE_TOKEN` only if using token-based Blob access or local fallback
 5. Deploy
 
 ### 5. Cloudflare (if custom domain)
@@ -38,6 +45,12 @@ git remote add origin https://github.com/YOUR_USERNAME/social-studio.git
 3. Add domain in Vercel project settings
 
 ### 6. Additional Services (add when needed)
+
+Current MVP Blob environment:
+- `BLOB_STORE_ID` supports connected Vercel Blob runtime/OIDC access.
+- `BLOB_READ_WRITE_TOKEN` is optional for local or token-based Blob fallback.
+- `BLOB_WEBHOOK_PUBLIC_KEY` is not required for the current MVP.
+
 - **OpenAI API key** → Phase 2 captions
 - **Vercel Blob store connection/OIDC** → Phase 2 image storage
 - **Vercel Blob read-write token** → optional local fallback when OIDC is unavailable

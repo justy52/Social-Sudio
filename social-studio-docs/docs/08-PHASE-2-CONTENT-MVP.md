@@ -76,7 +76,7 @@ Current implementation note: media upload/delete API is present and uses `post_i
 Current UI note: `/posts` now supports selected-business draft list/create/edit, image upload preview/delete, AI captions, basic image editor save, formal review workflow, Quick Export, exported-post state, and re-export. Calendar scheduling and publishing are still not built.
 
 **Create API routes:**
-- `POST /api/media/upload` — accept multipart FormData, validate image files only (JPG/PNG/WebP, max 10MB), upload to Vercel Blob, return URL + key + dimensions
+- `POST /api/media/upload` — accept multipart FormData, validate image files only (JPG/PNG/WebP, max 4MB), upload to Vercel Blob, return URL + key + dimensions
 - `DELETE /api/media/[key]` — delete from Blob and `post_media` record
 
 **Create upload hook** (`src/hooks/use-media.ts`).
@@ -89,7 +89,7 @@ Current UI note: `/posts` now supports selected-business draft list/create/edit,
 - Clear error on invalid file type
 
 **Acceptance criteria:**
-- [ ] Can upload JPG/PNG/WebP up to 10MB
+- [ ] Can upload JPG/PNG/WebP up to 4MB
 - [ ] Image preview shown after upload
 - [ ] Image stored in Vercel Blob and linked to post
 - [ ] Can remove uploaded image

@@ -20,7 +20,6 @@ import {
   getQueueThumbnailUrl,
   getTodayQueueSections,
   groupCalendarQueuePosts,
-  isQueuePostManuallyPosted,
 } from '@/lib/posts/calendar-queue';
 import {
   getPost,
@@ -66,7 +65,7 @@ export function CalendarPage() {
     queryFn: () => listPosts(getToken, activeBusiness?.id ?? ''),
     enabled: Boolean(activeBusiness?.id),
   });
-  const posts = postsQuery.data ?? [];
+  const posts = useMemo(() => postsQuery.data ?? [], [postsQuery.data]);
   const filteredPosts = useMemo(
     () => filterCalendarQueuePosts(posts, activeFilter),
     [activeFilter, posts],
