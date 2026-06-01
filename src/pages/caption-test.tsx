@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import type { DraftPost, DraftPostPlatform, DraftPostStatus } from '@/types';
 
 type CaptionTestFormState = {
@@ -29,6 +30,12 @@ type CaptionGenerateResponse = {
   captions: CaptionDraft[];
 };
 
+type DraftSummary = {
+  total: number;
+  needsReview: number;
+  approved: number;
+};
+
 const defaultForm: CaptionTestFormState = {
   businessName: 'Iron Backs Gym',
   businessType: 'Functional fitness gym',
@@ -45,16 +52,26 @@ const platformOptions: { value: DraftPostPlatform; label: string }[] = [
   { value: 'linkedin', label: 'LinkedIn' },
 ];
 
-const draftStatusOptions: { value: DraftPostStatus; label: string }[] = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'needs_review', label: 'Needs Review' },
-  { value: 'approved', label: 'Approved' },
+const draftStatusOptions: {
+  value: DraftPostStatus;
+  label: string;
+  actionLabel: string;
+}[] = [
+  { value: 'draft', label: 'Draft', actionLabel: 'Move to Draft' },
+  { value: 'needs_review', label: 'Needs Review', actionLabel: 'Mark Needs Review' },
+  { value: 'approved', label: 'Approved', actionLabel: 'Mark Approved' },
 ];
 
 const draftStatusLabels: Record<DraftPostStatus, string> = {
   draft: 'Draft',
   needs_review: 'Needs Review',
   approved: 'Approved',
+};
+
+const draftStatusStyles: Record<DraftPostStatus, string> = {
+  draft: 'border-border bg-muted text-muted-foreground',
+  needs_review: 'border-accent/30 bg-accent/10 text-accent',
+  approved: 'border-primary/30 bg-primary/10 text-primary',
 };
 
 export function CaptionTestPage() {
@@ -117,6 +134,7 @@ export function CaptionTestPage() {
     try {
       await navigator.clipboard.writeText(captionText);
       setCopiedIndex(index);
+      setError(null);
       window.setTimeout(() => setCopiedIndex(null), 1800);
     } catch (copyError) {
       setError(readError(copyError, 'Could not copy this caption.'));
@@ -149,6 +167,7 @@ export function CaptionTestPage() {
 
     setDraftPosts((currentDrafts) => [draftPost, ...currentDrafts]);
     setSavedIndex(index);
+    setError(null);
     window.setTimeout(() => setSavedIndex(null), 1800);
   }
 
@@ -166,342 +185,459 @@ export function CaptionTestPage() {
     );
   }
 
+  function handleClearDrafts() {
+    if (window.confirm('Clear all temporary drafts?')) {
+      setDraftPosts([]);
+    }
+  }
+
   const captions = result?.captions ?? [];
+  const draftSummary = getDraftSummary(draftPosts);
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <header>
-          <p className="text-sm font-medium uppercase text-muted-foreground">Internal test</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-normal">
-            Caption generation test
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Send a simple request to the isolated caption API and review the returned drafts.
-          </p>
+      <div className="mx-auto max-w-6xl space-y-8">
+        <header className="space-y-3">
+          <Badge>Internal workflow</Badge>
+          <div>
+            <h1 className="text-3xl font-semibold tracking-normal">Caption Studio</h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Generate caption drafts, save the best options, and review them before approval.
+            </p>
+          </div>
         </header>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Test inputs</CardTitle>
-              <CardDescription>Default values are ready for a quick gym caption test.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={handleSubmit}>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="business-name">Business Name</Label>
-                    <Input
-                      id="business-name"
-                      value={form.businessName}
-                      onChange={(event) =>
-                        setForm({ ...form, businessName: event.target.value })
-                      }
-                      required
-                    />
-                  </div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
+          <CaptionInputs
+            error={error}
+            form={form}
+            isLoading={isLoading}
+            onChange={setForm}
+            onSubmit={handleSubmit}
+          />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="business-type">Business Type</Label>
-                    <Input
-                      id="business-type"
-                      value={form.businessType}
-                      onChange={(event) =>
-                        setForm({ ...form, businessType: event.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="brand-voice">Brand Voice</Label>
-                  <Textarea
-                    id="brand-voice"
-                    value={form.brandVoice}
-                    onChange={(event) => setForm({ ...form, brandVoice: event.target.value })}
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="post-goal">Post Goal</Label>
-                    <Input
-                      id="post-goal"
-                      value={form.postGoal}
-                      onChange={(event) => setForm({ ...form, postGoal: event.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="platform">Platform</Label>
-                    <Select
-                      id="platform"
-                      value={form.platform}
-                      onChange={(event) =>
-                        setForm({ ...form, platform: event.target.value as DraftPostPlatform })
-                      }
-                    >
-                      {platformOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="media-description">Media Description</Label>
-                  <Textarea
-                    id="media-description"
-                    value={form.mediaDescription}
-                    onChange={(event) =>
-                      setForm({ ...form, mediaDescription: event.target.value })
-                    }
-                  />
-                </div>
-
-                {error && (
-                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                    {error}
-                  </div>
-                )}
-
-                <Button type="submit" disabled={isLoading}>
-                  <Sparkles className="h-4 w-4" aria-hidden="true" />
-                  {isLoading ? 'Generating' : 'Generate Captions'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <section className="space-y-3">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
-                Caption options
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Returned caption options appear here after submission.
-              </p>
-            </div>
-
-            {isLoading ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Generating captions</CardTitle>
-                  <CardDescription>The API is drafting options for this test post.</CardDescription>
-                </CardHeader>
-              </Card>
-            ) : result && captions.length === 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>No captions returned</CardTitle>
-                  <CardDescription>
-                    The API responded successfully, but did not include any caption drafts.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            ) : captions.length > 0 ? (
-              captions.map((caption, index) => (
-                <Card key={`${caption.hook}-${index}`}>
-                  <CardHeader>
-                    <CardTitle>{caption.hook}</CardTitle>
-                    <CardDescription>Tone: {caption.tone}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="whitespace-pre-wrap text-sm leading-6">{caption.caption}</p>
-
-                    <div className="flex flex-wrap gap-2">
-                      {caption.hashtags.map((hashtag) => (
-                        <span
-                          key={hashtag}
-                          className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
-                        >
-                          {hashtag}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleCopy(caption, index)}
-                      >
-                        {copiedIndex === index ? (
-                          <Check className="h-4 w-4" aria-hidden="true" />
-                        ) : (
-                          <Copy className="h-4 w-4" aria-hidden="true" />
-                        )}
-                        {copiedIndex === index ? 'Copied' : 'Copy Caption'}
-                      </Button>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => handleSaveDraft(caption, index)}
-                      >
-                        {savedIndex === index ? (
-                          <Check className="h-4 w-4" aria-hidden="true" />
-                        ) : (
-                          <Sparkles className="h-4 w-4" aria-hidden="true" />
-                        )}
-                        {savedIndex === index ? 'Saved' : 'Save Draft'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Ready to test</CardTitle>
-                  <CardDescription>
-                    Submit the form to call POST /api/ai/generate-caption.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            )}
-          </section>
+          <GeneratedCaptionOptions
+            captions={captions}
+            copiedIndex={copiedIndex}
+            isLoading={isLoading}
+            platform={form.platform}
+            result={result}
+            savedIndex={savedIndex}
+            onCopy={handleCopy}
+            onSaveDraft={handleSaveDraft}
+          />
         </div>
 
-        <TemporaryDraftPosts
+        <TemporaryDraftReview
           draftPosts={draftPosts}
-          onStatusChange={handleDraftStatusChange}
+          summary={draftSummary}
+          onClearAll={handleClearDrafts}
           onRemove={handleRemoveDraft}
+          onStatusChange={handleDraftStatusChange}
         />
       </div>
     </main>
   );
 }
 
-function TemporaryDraftPosts({
-  draftPosts,
-  onStatusChange,
-  onRemove,
+function CaptionInputs({
+  error,
+  form,
+  isLoading,
+  onChange,
+  onSubmit,
 }: {
-  draftPosts: DraftPost[];
-  onStatusChange: (draftId: string, status: DraftPostStatus) => void;
-  onRemove: (draftId: string) => void;
+  error: string | null;
+  form: CaptionTestFormState;
+  isLoading: boolean;
+  onChange: (form: CaptionTestFormState) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <section className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
-            Temporary draft posts
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Saved caption drafts for this browser session.
-          </p>
+      <SectionHeading
+        title="Caption Inputs"
+        description="Business context, post goal, media notes, and destination platform."
+      />
+
+      <Card>
+        <CardContent className="p-5">
+          <form className="space-y-4" onSubmit={onSubmit}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="business-name">Business Name</Label>
+                <Input
+                  id="business-name"
+                  value={form.businessName}
+                  onChange={(event) => onChange({ ...form, businessName: event.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="business-type">Business Type</Label>
+                <Input
+                  id="business-type"
+                  value={form.businessType}
+                  onChange={(event) => onChange({ ...form, businessType: event.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="brand-voice">Brand Voice</Label>
+              <Textarea
+                id="brand-voice"
+                value={form.brandVoice}
+                onChange={(event) => onChange({ ...form, brandVoice: event.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="post-goal">Post Goal</Label>
+                <Input
+                  id="post-goal"
+                  value={form.postGoal}
+                  onChange={(event) => onChange({ ...form, postGoal: event.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="platform">Platform</Label>
+                <Select
+                  id="platform"
+                  value={form.platform}
+                  onChange={(event) =>
+                    onChange({ ...form, platform: event.target.value as DraftPostPlatform })
+                  }
+                >
+                  {platformOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="media-description">Media Description</Label>
+              <Textarea
+                id="media-description"
+                value={form.mediaDescription}
+                onChange={(event) => onChange({ ...form, mediaDescription: event.target.value })}
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" disabled={isLoading}>
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              {isLoading ? 'Generating' : 'Generate Captions'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function GeneratedCaptionOptions({
+  captions,
+  copiedIndex,
+  isLoading,
+  platform,
+  result,
+  savedIndex,
+  onCopy,
+  onSaveDraft,
+}: {
+  captions: CaptionDraft[];
+  copiedIndex: number | null;
+  isLoading: boolean;
+  platform: DraftPostPlatform;
+  result: CaptionGenerateResponse | null;
+  savedIndex: number | null;
+  onCopy: (caption: CaptionDraft, index: number) => Promise<void>;
+  onSaveDraft: (caption: CaptionDraft, index: number) => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeading
+        title="Generated Caption Options"
+        description="AI-generated drafts for review before they become approved posts."
+      />
+
+      {isLoading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Generating captions</CardTitle>
+            <CardDescription>The API is drafting options for this post.</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : result && captions.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No captions returned</CardTitle>
+            <CardDescription>
+              The API responded successfully, but did not include any caption drafts.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : captions.length > 0 ? (
+        <div className="space-y-3">
+          {captions.map((caption, index) => (
+            <Card key={`${caption.hook}-${index}`}>
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle>{caption.hook}</CardTitle>
+                    <CardDescription>Tone: {caption.tone}</CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge>{formatPlatform(platform)}</Badge>
+                    <Badge className="border-accent/30 bg-accent/10 text-accent">
+                      AI draft
+                    </Badge>
+                    <Badge className="border-border bg-background text-muted-foreground">
+                      Needs review
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="whitespace-pre-wrap text-sm leading-6">{caption.caption}</p>
+
+                <div className="flex flex-wrap gap-2">
+                  {caption.hashtags.map((hashtag) => (
+                    <span
+                      key={hashtag}
+                      className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
+                    >
+                      {hashtag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void onCopy(caption, index)}
+                  >
+                    {copiedIndex === index ? (
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Copy className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {copiedIndex === index ? 'Copied' : 'Copy Caption'}
+                  </Button>
+
+                  <Button type="button" size="sm" onClick={() => onSaveDraft(caption, index)}>
+                    {savedIndex === index ? (
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {savedIndex === index ? 'Saved' : 'Save Draft'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ready to generate</CardTitle>
+            <CardDescription>Submit caption inputs to create AI draft options.</CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+    </section>
+  );
+}
+
+function TemporaryDraftReview({
+  draftPosts,
+  summary,
+  onClearAll,
+  onRemove,
+  onStatusChange,
+}: {
+  draftPosts: DraftPost[];
+  summary: DraftSummary;
+  onClearAll: () => void;
+  onRemove: (draftId: string) => void;
+  onStatusChange: (draftId: string, status: DraftPostStatus) => void;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <SectionHeading
+          title="Temporary Draft Review"
+          description="Frontend-only saved drafts for this browser session."
+        />
         {draftPosts.length > 0 && (
-          <Badge>{draftPosts.length} saved</Badge>
+          <Button type="button" variant="outline" size="sm" onClick={onClearAll}>
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            Clear All Drafts
+          </Button>
         )}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <SummaryStat label="Total temporary drafts" value={summary.total} />
+        <SummaryStat label="Needs review" value={summary.needsReview} />
+        <SummaryStat label="Approved" value={summary.approved} />
       </div>
 
       {draftPosts.length === 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>No draft posts yet</CardTitle>
-            <CardDescription>
-              Save a generated caption to start a temporary approval workflow.
-            </CardDescription>
+            <CardDescription>Save a generated caption to start reviewing drafts.</CardDescription>
           </CardHeader>
         </Card>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {draftPosts.map((draftPost) => (
-            <Card key={draftPost.id}>
-              <CardHeader>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <CardTitle>{draftPost.hook}</CardTitle>
-                    <CardDescription>
-                      {draftPost.businessName} - {formatPlatform(draftPost.platform)}
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge>{draftStatusLabels[draftPost.status]}</Badge>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onRemove(draftPost.id)}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-end">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      Business type
-                    </p>
-                    <p className="text-sm">{draftPost.businessType}</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`draft-status-${draftPost.id}`}>Status</Label>
-                    <Select
-                      id={`draft-status-${draftPost.id}`}
-                      value={draftPost.status}
-                      onChange={(event) =>
-                        onStatusChange(draftPost.id, event.target.value as DraftPostStatus)
-                      }
-                    >
-                      {draftStatusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                {draftPost.mediaDescription && (
-                  <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      Media
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {draftPost.mediaDescription}
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <p className="whitespace-pre-wrap text-sm leading-6">{draftPost.caption}</p>
-                  {draftPost.hashtags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {draftPost.hashtags.map((hashtag) => (
-                        <span
-                          key={hashtag}
-                          className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
-                        >
-                          {hashtag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>Tone: {draftPost.tone}</span>
-                  <span>Created: {formatDraftDate(draftPost.createdAt)}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <DraftReviewCard
+              key={draftPost.id}
+              draftPost={draftPost}
+              onRemove={onRemove}
+              onStatusChange={onStatusChange}
+            />
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+function DraftReviewCard({
+  draftPost,
+  onRemove,
+  onStatusChange,
+}: {
+  draftPost: DraftPost;
+  onRemove: (draftId: string) => void;
+  onStatusChange: (draftId: string, status: DraftPostStatus) => void;
+}) {
+  return (
+    <Card className={cn('overflow-hidden', getDraftCardClassName(draftPost.status))}>
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>{draftPost.hook}</CardTitle>
+            <CardDescription>
+              {draftPost.businessName} - {formatPlatform(draftPost.platform)}
+            </CardDescription>
+          </div>
+          <Badge className={getStatusBadgeClassName(draftPost.status)}>
+            {draftStatusLabels[draftPost.status]}
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MetadataBlock label="Business type" value={draftPost.businessType} />
+          <MetadataBlock label="Tone" value={draftPost.tone} />
+        </div>
+
+        {draftPost.mediaDescription && (
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Media</p>
+            <p className="mt-1 text-sm text-muted-foreground">{draftPost.mediaDescription}</p>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <p className="whitespace-pre-wrap text-sm leading-6">{draftPost.caption}</p>
+          {draftPost.hashtags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {draftPost.hashtags.map((hashtag) => (
+                <span
+                  key={hashtag}
+                  className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
+                >
+                  {hashtag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {draftStatusOptions.map((option) => {
+            const isCurrentStatus = option.value === draftPost.status;
+
+            return (
+              <Button
+                key={option.value}
+                type="button"
+                variant={isCurrentStatus ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => onStatusChange(draftPost.id, option.value)}
+              >
+                {isCurrentStatus && <Check className="h-4 w-4" aria-hidden="true" />}
+                {option.actionLabel}
+              </Button>
+            );
+          })}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onRemove(draftPost.id)}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            Remove
+          </Button>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Created {formatDraftDate(draftPost.createdAt)}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SectionHeading({ title, description }: { title: string; description: string }) {
+  return (
+    <div>
+      <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
+        {title}
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function SummaryStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-border bg-card px-4 py-3">
+      <p className="text-2xl font-semibold tracking-normal">{value}</p>
+      <p className="mt-1 text-xs font-medium uppercase text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function MetadataBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className="text-sm">{value}</p>
+    </div>
   );
 }
 
@@ -588,4 +724,31 @@ function formatDraftDate(value: string) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function getDraftSummary(draftPosts: DraftPost[]): DraftSummary {
+  return draftPosts.reduce<DraftSummary>(
+    (summary, draftPost) => ({
+      total: summary.total + 1,
+      needsReview: summary.needsReview + (draftPost.status === 'needs_review' ? 1 : 0),
+      approved: summary.approved + (draftPost.status === 'approved' ? 1 : 0),
+    }),
+    { total: 0, needsReview: 0, approved: 0 },
+  );
+}
+
+function getDraftCardClassName(status: DraftPostStatus) {
+  if (status === 'approved') {
+    return 'border-primary/30';
+  }
+
+  if (status === 'needs_review') {
+    return 'border-accent/30';
+  }
+
+  return '';
+}
+
+function getStatusBadgeClassName(status: DraftPostStatus) {
+  return cn('font-semibold', draftStatusStyles[status]);
 }
