@@ -55,7 +55,8 @@ type OpenAIResponse = {
   output?: OpenAIResponseMessage[];
 };
 
-const openAiIdeaModel = process.env.OPENAI_IDEA_MODEL ?? 'gpt-5.4-mini';
+const defaultOpenAiGenerationModel = 'gpt-5.4-mini';
+const openAiIdeaModel = process.env.OPENAI_IDEA_MODEL ?? defaultOpenAiGenerationModel;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {

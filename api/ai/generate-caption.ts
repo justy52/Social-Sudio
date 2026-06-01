@@ -2,10 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { ApiError, handleApiError, methodNotAllowed, parseJsonBody, sendJson } from '../../src/lib/api-helpers.ts';
 import { loadServerEnv } from '../../src/lib/server-env.ts';
+import { draftPostPlatforms, type DraftPostPlatform } from '../../src/types/index.ts';
 
 loadServerEnv();
-
-const platforms = ['instagram', 'facebook', 'tiktok', 'linkedin'] as const;
 
 const isolatedCaptionGenerateSchema = z
   .object({
@@ -14,11 +13,9 @@ const isolatedCaptionGenerateSchema = z
     brandVoice: z.string().trim().max(800).optional(),
     postGoal: z.string().trim().max(300).optional(),
     mediaDescription: z.string().trim().max(1200).optional(),
-    platform: z.enum(platforms).optional().default('instagram'),
+    platform: z.enum(draftPostPlatforms).optional().default('instagram'),
   })
   .strict();
-
-type CaptionPlatform = (typeof platforms)[number];
 
 type IsolatedCaptionGenerateInput = z.infer<typeof isolatedCaptionGenerateSchema>;
 
@@ -32,6 +29,17 @@ type CaptionDraft = {
 type CaptionGenerateResponse = {
   captions: CaptionDraft[];
 };
+
+const captionDraftSchema = z.object({
+  caption: z.string().trim().min(1).max(2200),
+  hook: z.string().trim().min(1).max(240),
+  hashtags: z.array(z.string().trim().min(1)),
+  tone: z.string().trim().min(1).max(300),
+});
+
+const captionGenerateResponseSchema = z.object({
+  captions: z.array(captionDraftSchema).min(1),
+});
 
 type OpenAIResponseOutputText = {
   type: 'output_text';
@@ -48,7 +56,8 @@ type OpenAIResponse = {
   output?: OpenAIResponseMessage[];
 };
 
-const openAiCaptionModel = 'gpt-5.4-mini';
+const defaultOpenAiGenerationModel = 'gpt-5.4-mini';
+const openAiCaptionModel = process.env.OPENAI_CAPTION_MODEL ?? defaultOpenAiGenerationModel;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -57,7 +66,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const input = isolatedCaptionGenerateSchema.parse(parseJsonBody(req));
-    const result = await generateIsolatedCaptions(input);
+    const result = process.env.OPENAI_API_KEY
+      ? await generateIsolatedCaptions(input)
+      : buildFallbackCaptions(input);
 
     return sendJson<CaptionGenerateResponse>(res, 200, result);
   } catch (error) {
@@ -68,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 async function generateIsolatedCaptions(
   input: IsolatedCaptionGenerateInput,
 ): Promise<CaptionGenerateResponse> {
-  const apiKey = requireOpenAIApiKey(process.env.OPENAI_API_KEY);
+  const apiKey = process.env.OPENAI_API_KEY;
   let response: Response;
 
   try {
@@ -103,15 +114,7 @@ async function generateIsolatedCaptions(
   return parseCaptionDrafts(text);
 }
 
-function requireOpenAIApiKey(apiKey: string | undefined) {
-  if (!apiKey) {
-    throw new ApiError(500, 'OPENAI_API_KEY is not configured');
-  }
-
-  return apiKey;
-}
-
-function buildSystemPrompt(platform: CaptionPlatform) {
+function buildSystemPrompt(platform: DraftPostPlatform) {
   return [
     'You are a senior social media copywriter.',
     `Write ${platform} captions for a small business owner.`,
@@ -171,12 +174,14 @@ function parseCaptionDrafts(rawText: string): CaptionGenerateResponse {
     throw new ApiError(502, 'Caption generation returned invalid JSON.');
   }
 
-  if (!isCaptionGenerateResponse(parsed)) {
+  const result = captionGenerateResponseSchema.safeParse(parsed);
+
+  if (!result.success) {
     throw new ApiError(502, 'Caption generation returned an unexpected format.');
   }
 
   return {
-    captions: parsed.captions
+    captions: result.data.captions
       .map((caption) => ({
         caption: caption.caption.trim(),
         hook: caption.hook.trim(),
@@ -186,32 +191,6 @@ function parseCaptionDrafts(rawText: string): CaptionGenerateResponse {
       .filter((caption) => caption.caption && caption.hook)
       .slice(0, 3),
   };
-}
-
-function isCaptionGenerateResponse(value: unknown): value is CaptionGenerateResponse {
-  if (!value || typeof value !== 'object' || !('captions' in value)) {
-    return false;
-  }
-
-  const captions = (value as { captions: unknown }).captions;
-
-  return Array.isArray(captions) && captions.every(isCaptionDraft);
-}
-
-function isCaptionDraft(value: unknown): value is CaptionDraft {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const draft = value as Record<string, unknown>;
-
-  return (
-    typeof draft.caption === 'string' &&
-    typeof draft.hook === 'string' &&
-    typeof draft.tone === 'string' &&
-    Array.isArray(draft.hashtags) &&
-    draft.hashtags.every((hashtag) => typeof hashtag === 'string')
-  );
 }
 
 function normalizeHashtags(hashtags: string[]) {
@@ -225,7 +204,7 @@ function normalizeHashtags(hashtags: string[]) {
       continue;
     }
 
-    const formatted = `#${tag.replace(/\s+/g, '')}`;
+    const formatted = `#${tag.replace(/\s+/g, '').slice(0, 79)}`;
     const key = formatted.toLocaleLowerCase();
 
     if (!seen.has(key)) {
@@ -235,4 +214,43 @@ function normalizeHashtags(hashtags: string[]) {
   }
 
   return normalized.slice(0, 10);
+}
+
+function buildFallbackCaptions(input: IsolatedCaptionGenerateInput): CaptionGenerateResponse {
+  const platform = input.platform;
+  const goal = input.postGoal || 'connect with the right people';
+  const businessType = input.businessType || 'local business';
+  const hashtags = normalizeHashtags([
+    input.businessName,
+    businessType,
+    platform,
+    'SmallBusiness',
+    'Community',
+  ]);
+
+  return captionGenerateResponseSchema.parse({
+    captions: [
+      {
+        hook: `Ready to try ${input.businessName}?`,
+        caption: [
+          `${input.businessName} is built for people who want more than another ${businessType} option.`,
+          input.mediaDescription
+            ? `Here is the moment: ${input.mediaDescription}.`
+            : 'Show up, put in the work, and feel what the community is about.',
+          `If your goal is to ${goal.toLocaleLowerCase()}, this is your sign to start.`,
+        ].join('\n\n'),
+        hashtags,
+        tone: input.brandVoice || 'Motivating and community-focused',
+      },
+      {
+        hook: 'Your next strong step starts here.',
+        caption: [
+          `For anyone looking for ${businessType} support, ${input.businessName} keeps it simple: real work, real progress, real people beside you.`,
+          `Take the next step and ${goal.toLocaleLowerCase()}.`,
+        ].join('\n\n'),
+        hashtags,
+        tone: input.brandVoice || 'Clear and encouraging',
+      },
+    ],
+  });
 }
