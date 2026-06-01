@@ -1,13 +1,13 @@
 import { FormEvent, useState } from 'react';
 import { Check, Copy, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-
-type Platform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin';
+import type { DraftPost, DraftPostPlatform, DraftPostStatus } from '@/types';
 
 type CaptionTestFormState = {
   businessName: string;
@@ -15,7 +15,7 @@ type CaptionTestFormState = {
   brandVoice: string;
   postGoal: string;
   mediaDescription: string;
-  platform: Platform;
+  platform: DraftPostPlatform;
 };
 
 type CaptionDraft = {
@@ -38,12 +38,24 @@ const defaultForm: CaptionTestFormState = {
   platform: 'instagram',
 };
 
-const platformOptions: { value: Platform; label: string }[] = [
+const platformOptions: { value: DraftPostPlatform; label: string }[] = [
   { value: 'instagram', label: 'Instagram' },
   { value: 'facebook', label: 'Facebook' },
   { value: 'tiktok', label: 'TikTok' },
   { value: 'linkedin', label: 'LinkedIn' },
 ];
+
+const draftStatusOptions: { value: DraftPostStatus; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'needs_review', label: 'Needs Review' },
+  { value: 'approved', label: 'Approved' },
+];
+
+const draftStatusLabels: Record<DraftPostStatus, string> = {
+  draft: 'Draft',
+  needs_review: 'Needs Review',
+  approved: 'Approved',
+};
 
 export function CaptionTestPage() {
   const [form, setForm] = useState<CaptionTestFormState>(defaultForm);
@@ -51,6 +63,8 @@ export function CaptionTestPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [savedIndex, setSavedIndex] = useState<number | null>(null);
+  const [draftPosts, setDraftPosts] = useState<DraftPost[]>([]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,6 +78,7 @@ export function CaptionTestPage() {
     setError(null);
     setResult(null);
     setCopiedIndex(null);
+    setSavedIndex(null);
 
     try {
       const response = await fetch('/api/ai/generate-caption', {
@@ -106,6 +121,43 @@ export function CaptionTestPage() {
     } catch (copyError) {
       setError(readError(copyError, 'Could not copy this caption.'));
     }
+  }
+
+  function handleSaveDraft(caption: CaptionDraft, index: number) {
+    const businessName = form.businessName.trim();
+    const businessType = form.businessType.trim();
+
+    if (!businessName || !businessType) {
+      setError('Business Name and Business Type are required before saving a draft.');
+      return;
+    }
+
+    const mediaDescription = form.mediaDescription.trim();
+    const draftPost: DraftPost = {
+      id: createDraftId(),
+      businessName,
+      businessType,
+      platform: form.platform,
+      ...(mediaDescription ? { mediaDescription } : {}),
+      caption: caption.caption,
+      hook: caption.hook,
+      hashtags: caption.hashtags,
+      tone: caption.tone,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+    };
+
+    setDraftPosts((currentDrafts) => [draftPost, ...currentDrafts]);
+    setSavedIndex(index);
+    window.setTimeout(() => setSavedIndex(null), 1800);
+  }
+
+  function handleDraftStatusChange(draftId: string, status: DraftPostStatus) {
+    setDraftPosts((currentDrafts) =>
+      currentDrafts.map((draftPost) =>
+        draftPost.id === draftId ? { ...draftPost, status } : draftPost,
+      ),
+    );
   }
 
   const captions = result?.captions ?? [];
@@ -182,7 +234,7 @@ export function CaptionTestPage() {
                       id="platform"
                       value={form.platform}
                       onChange={(event) =>
-                        setForm({ ...form, platform: event.target.value as Platform })
+                        setForm({ ...form, platform: event.target.value as DraftPostPlatform })
                       }
                     >
                       {platformOptions.map((option) => (
@@ -222,7 +274,7 @@ export function CaptionTestPage() {
           <section className="space-y-3">
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
-                Drafts
+                Caption options
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Returned caption options appear here after submission.
@@ -266,19 +318,34 @@ export function CaptionTestPage() {
                       ))}
                     </div>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleCopy(caption, index)}
-                    >
-                      {copiedIndex === index ? (
-                        <Check className="h-4 w-4" aria-hidden="true" />
-                      ) : (
-                        <Copy className="h-4 w-4" aria-hidden="true" />
-                      )}
-                      {copiedIndex === index ? 'Copied' : 'Copy Caption'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleCopy(caption, index)}
+                      >
+                        {copiedIndex === index ? (
+                          <Check className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Copy className="h-4 w-4" aria-hidden="true" />
+                        )}
+                        {copiedIndex === index ? 'Copied' : 'Copy Caption'}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleSaveDraft(caption, index)}
+                      >
+                        {savedIndex === index ? (
+                          <Check className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" aria-hidden="true" />
+                        )}
+                        {savedIndex === index ? 'Saved' : 'Save Draft'}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))
@@ -294,8 +361,127 @@ export function CaptionTestPage() {
             )}
           </section>
         </div>
+
+        <TemporaryDraftPosts
+          draftPosts={draftPosts}
+          onStatusChange={handleDraftStatusChange}
+        />
       </div>
     </main>
+  );
+}
+
+function TemporaryDraftPosts({
+  draftPosts,
+  onStatusChange,
+}: {
+  draftPosts: DraftPost[];
+  onStatusChange: (draftId: string, status: DraftPostStatus) => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
+            Temporary draft posts
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Saved caption drafts for this browser session.
+          </p>
+        </div>
+        {draftPosts.length > 0 && (
+          <Badge>{draftPosts.length} saved</Badge>
+        )}
+      </div>
+
+      {draftPosts.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No draft posts yet</CardTitle>
+            <CardDescription>
+              Save a generated caption to start a temporary approval workflow.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {draftPosts.map((draftPost) => (
+            <Card key={draftPost.id}>
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle>{draftPost.hook}</CardTitle>
+                    <CardDescription>
+                      {draftPost.businessName} - {formatPlatform(draftPost.platform)}
+                    </CardDescription>
+                  </div>
+                  <Badge>{draftStatusLabels[draftPost.status]}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-end">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                      Business type
+                    </p>
+                    <p className="text-sm">{draftPost.businessType}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`draft-status-${draftPost.id}`}>Status</Label>
+                    <Select
+                      id={`draft-status-${draftPost.id}`}
+                      value={draftPost.status}
+                      onChange={(event) =>
+                        onStatusChange(draftPost.id, event.target.value as DraftPostStatus)
+                      }
+                    >
+                      {draftStatusOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+
+                {draftPost.mediaDescription && (
+                  <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                      Media
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {draftPost.mediaDescription}
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <p className="whitespace-pre-wrap text-sm leading-6">{draftPost.caption}</p>
+                  {draftPost.hashtags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {draftPost.hashtags.map((hashtag) => (
+                        <span
+                          key={hashtag}
+                          className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
+                        >
+                          {hashtag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>Tone: {draftPost.tone}</span>
+                  <span>Created: {formatDraftDate(draftPost.createdAt)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -361,4 +547,25 @@ function parseApiError(responseText: string, status: number) {
 
 function readError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function createDraftId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function formatPlatform(platform: DraftPostPlatform) {
+  return platformOptions.find((option) => option.value === platform)?.label ?? platform;
+}
+
+function formatDraftDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
 }

@@ -25,3 +25,21 @@ export interface BusinessFormValues {
   logoUrl?: string;
   timezone?: string;
 }
+
+export type DraftPostPlatform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin';
+
+export type DraftPostStatus = 'draft' | 'needs_review' | 'approved';
+
+export type DraftPost = {
+  id: string;
+  businessName: string;
+  businessType: string;
+  platform: DraftPostPlatform;
+  mediaDescription?: string;
+  caption: string;
+  hook: string;
+  hashtags: string[];
+  tone: string;
+  status: DraftPostStatus;
+  createdAt: string;
+};
