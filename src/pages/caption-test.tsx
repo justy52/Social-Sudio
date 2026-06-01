@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Check, Copy, Sparkles, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -84,9 +84,14 @@ const draftStatusStyles: Record<DraftPostStatus, string> = {
   approved: 'border-primary/30 bg-primary/10 text-primary',
 };
 
+const storageKeys = {
+  businessProfile: 'socialStudio.businessProfile.v1',
+  draftPosts: 'socialStudio.draftPosts.v1',
+};
+
 export function CaptionTestPage() {
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() =>
-    createDefaultBusinessProfile(),
+    loadStoredBusinessProfile(),
   );
   const [form, setForm] = useState<CaptionTestFormState>(defaultForm);
   const [result, setResult] = useState<CaptionGenerateResponse | null>(null);
@@ -94,7 +99,25 @@ export function CaptionTestPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [savedIndex, setSavedIndex] = useState<number | null>(null);
-  const [draftPosts, setDraftPosts] = useState<DraftPost[]>([]);
+  const [draftPosts, setDraftPosts] = useState<DraftPost[]>(() => loadStoredDraftPosts());
+
+  useEffect(() => {
+    if (isDefaultBusinessProfile(businessProfile)) {
+      removeLocalStorageItem(storageKeys.businessProfile);
+      return;
+    }
+
+    setLocalStorageJson(storageKeys.businessProfile, businessProfile);
+  }, [businessProfile]);
+
+  useEffect(() => {
+    if (draftPosts.length === 0) {
+      removeLocalStorageItem(storageKeys.draftPosts);
+      return;
+    }
+
+    setLocalStorageJson(storageKeys.draftPosts, draftPosts);
+  }, [draftPosts]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -200,7 +223,16 @@ export function CaptionTestPage() {
 
   function handleClearDrafts() {
     if (window.confirm('Clear all temporary drafts?')) {
+      removeLocalStorageItem(storageKeys.draftPosts);
       setDraftPosts([]);
+    }
+  }
+
+  function handleResetBusinessProfile() {
+    if (window.confirm('Reset the business profile to the default Iron Backs Gym profile?')) {
+      removeLocalStorageItem(storageKeys.businessProfile);
+      setBusinessProfile(createDefaultBusinessProfile());
+      setError(null);
     }
   }
 
@@ -239,6 +271,7 @@ export function CaptionTestPage() {
         <BusinessProfileMemory
           profile={businessProfile}
           onChange={setBusinessProfile}
+          onResetProfile={handleResetBusinessProfile}
           onUseProfile={handleUseProfileForCaptionInputs}
         />
 
@@ -278,10 +311,12 @@ export function CaptionTestPage() {
 function BusinessProfileMemory({
   profile,
   onChange,
+  onResetProfile,
   onUseProfile,
 }: {
   profile: BusinessProfile;
   onChange: (profile: BusinessProfile) => void;
+  onResetProfile: () => void;
   onUseProfile: () => void;
 }) {
   function handleTextChange(field: BusinessProfileTextField, value: string) {
@@ -307,16 +342,22 @@ function BusinessProfileMemory({
           title="Business Profile / Brand Memory"
           description="Reusable brand context for caption generation inputs."
         />
-        <Button type="button" onClick={onUseProfile}>
-          <Sparkles className="h-4 w-4" aria-hidden="true" />
-          Use Profile for Caption Inputs
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={onResetProfile}>
+            Reset Profile
+          </Button>
+          <Button type="button" onClick={onUseProfile}>
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            Use Profile for Caption Inputs
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardContent className="space-y-4 p-5">
           <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-            This profile is temporary and will reset on refresh until database storage is added.
+            Saved locally in this browser for prototype testing. Profile and drafts are not synced
+            across devices and are not stored in a backend database yet.
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -890,6 +931,152 @@ function readError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
+function loadStoredBusinessProfile() {
+  const storedValue = getLocalStorageJson(storageKeys.businessProfile);
+
+  if (isBusinessProfile(storedValue)) {
+    return storedValue;
+  }
+
+  if (storedValue !== null) {
+    removeLocalStorageItem(storageKeys.businessProfile);
+  }
+
+  return createDefaultBusinessProfile();
+}
+
+function loadStoredDraftPosts() {
+  const storedValue = getLocalStorageJson(storageKeys.draftPosts);
+
+  if (isDraftPostArray(storedValue)) {
+    return storedValue;
+  }
+
+  if (storedValue !== null) {
+    removeLocalStorageItem(storageKeys.draftPosts);
+  }
+
+  return [];
+}
+
+function getLocalStorageJson(key: string): unknown {
+  const storage = getBrowserLocalStorage();
+
+  if (!storage) {
+    return null;
+  }
+
+  const value = storage.getItem(key);
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    removeLocalStorageItem(key);
+    return null;
+  }
+}
+
+function setLocalStorageJson(key: string, value: unknown) {
+  const storage = getBrowserLocalStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Prototype persistence should never block the workflow.
+  }
+}
+
+function removeLocalStorageItem(key: string) {
+  const storage = getBrowserLocalStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Ignore storage errors in the prototype.
+  }
+}
+
+function getBrowserLocalStorage() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function isBusinessProfile(value: unknown): value is BusinessProfile {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.businessName === 'string' &&
+    typeof value.businessType === 'string' &&
+    typeof value.brandVoice === 'string' &&
+    typeof value.targetAudience === 'string' &&
+    typeof value.coreServices === 'string' &&
+    typeof value.primaryOffer === 'string' &&
+    typeof value.contentStyle === 'string' &&
+    isDraftPostPlatform(value.defaultPlatform) &&
+    (value.notes === undefined || typeof value.notes === 'string') &&
+    typeof value.updatedAt === 'string'
+  );
+}
+
+function isDraftPostArray(value: unknown): value is DraftPost[] {
+  return Array.isArray(value) && value.every(isDraftPost);
+}
+
+function isDraftPost(value: unknown): value is DraftPost {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.businessName === 'string' &&
+    typeof value.businessType === 'string' &&
+    isDraftPostPlatform(value.platform) &&
+    (value.mediaDescription === undefined || typeof value.mediaDescription === 'string') &&
+    typeof value.caption === 'string' &&
+    typeof value.hook === 'string' &&
+    Array.isArray(value.hashtags) &&
+    value.hashtags.every((hashtag) => typeof hashtag === 'string') &&
+    typeof value.tone === 'string' &&
+    isDraftPostStatus(value.status) &&
+    typeof value.createdAt === 'string'
+  );
+}
+
+function isDraftPostPlatform(value: unknown): value is DraftPostPlatform {
+  return platformOptions.some((option) => option.value === value);
+}
+
+function isDraftPostStatus(value: unknown): value is DraftPostStatus {
+  return draftStatusOptions.some((option) => option.value === value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
 function buildMediaDescriptionContext(
   currentMediaDescription: string,
   profile: BusinessProfile,
@@ -937,6 +1124,23 @@ function createDefaultBusinessProfile(): BusinessProfile {
     notes: 'Avoid CrossFit terminology. Emphasize functional fitness, strength, grit, and community.',
     updatedAt: new Date().toISOString(),
   };
+}
+
+function isDefaultBusinessProfile(profile: BusinessProfile) {
+  const defaultProfile = createDefaultBusinessProfile();
+
+  return (
+    profile.id === defaultProfile.id &&
+    profile.businessName === defaultProfile.businessName &&
+    profile.businessType === defaultProfile.businessType &&
+    profile.brandVoice === defaultProfile.brandVoice &&
+    profile.targetAudience === defaultProfile.targetAudience &&
+    profile.coreServices === defaultProfile.coreServices &&
+    profile.primaryOffer === defaultProfile.primaryOffer &&
+    profile.contentStyle === defaultProfile.contentStyle &&
+    profile.defaultPlatform === defaultProfile.defaultPlatform &&
+    (profile.notes ?? '') === (defaultProfile.notes ?? '')
+  );
 }
 
 function createDraftId() {
