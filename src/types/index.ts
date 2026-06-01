@@ -30,6 +30,20 @@ export type DraftPostPlatform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin'
 
 export type DraftPostStatus = 'draft' | 'needs_review' | 'approved';
 
+export type BusinessProfile = {
+  id: string;
+  businessName: string;
+  businessType: string;
+  brandVoice: string;
+  targetAudience: string;
+  coreServices: string;
+  primaryOffer: string;
+  contentStyle: string;
+  defaultPlatform: DraftPostPlatform;
+  notes?: string;
+  updatedAt: string;
+};
+
 export type DraftPost = {
   id: string;
   businessName: string;

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { DraftPost, DraftPostPlatform, DraftPostStatus } from '@/types';
+import type { BusinessProfile, DraftPost, DraftPostPlatform, DraftPostStatus } from '@/types';
 
 type CaptionTestFormState = {
   businessName: string;
@@ -35,6 +35,16 @@ type DraftSummary = {
   needsReview: number;
   approved: number;
 };
+
+type BusinessProfileTextField =
+  | 'businessName'
+  | 'businessType'
+  | 'brandVoice'
+  | 'targetAudience'
+  | 'coreServices'
+  | 'primaryOffer'
+  | 'contentStyle'
+  | 'notes';
 
 const defaultForm: CaptionTestFormState = {
   businessName: 'Iron Backs Gym',
@@ -75,6 +85,9 @@ const draftStatusStyles: Record<DraftPostStatus, string> = {
 };
 
 export function CaptionTestPage() {
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() =>
+    createDefaultBusinessProfile(),
+  );
   const [form, setForm] = useState<CaptionTestFormState>(defaultForm);
   const [result, setResult] = useState<CaptionGenerateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +204,18 @@ export function CaptionTestPage() {
     }
   }
 
+  function handleUseProfileForCaptionInputs() {
+    setForm((currentForm) => ({
+      ...currentForm,
+      businessName: businessProfile.businessName,
+      businessType: businessProfile.businessType,
+      brandVoice: buildBrandVoiceContext(businessProfile),
+      postGoal: businessProfile.primaryOffer,
+      platform: businessProfile.defaultPlatform,
+    }));
+    setError(null);
+  }
+
   const captions = result?.captions ?? [];
   const draftSummary = getDraftSummary(draftPosts);
 
@@ -206,6 +231,12 @@ export function CaptionTestPage() {
             </p>
           </div>
         </header>
+
+        <BusinessProfileMemory
+          profile={businessProfile}
+          onChange={setBusinessProfile}
+          onUseProfile={handleUseProfileForCaptionInputs}
+        />
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
           <CaptionInputs
@@ -237,6 +268,156 @@ export function CaptionTestPage() {
         />
       </div>
     </main>
+  );
+}
+
+function BusinessProfileMemory({
+  profile,
+  onChange,
+  onUseProfile,
+}: {
+  profile: BusinessProfile;
+  onChange: (profile: BusinessProfile) => void;
+  onUseProfile: () => void;
+}) {
+  function handleTextChange(field: BusinessProfileTextField, value: string) {
+    onChange({
+      ...profile,
+      [field]: value,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  function handlePlatformChange(platform: DraftPostPlatform) {
+    onChange({
+      ...profile,
+      defaultPlatform: platform,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <SectionHeading
+          title="Business Profile / Brand Memory"
+          description="Reusable brand context for caption generation inputs."
+        />
+        <Button type="button" onClick={onUseProfile}>
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+          Use Profile for Caption Inputs
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            This profile is temporary and will reset on refresh until database storage is added.
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="profile-business-name">Business Name</Label>
+              <Input
+                id="profile-business-name"
+                value={profile.businessName}
+                onChange={(event) => handleTextChange('businessName', event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="profile-business-type">Business Type</Label>
+              <Input
+                id="profile-business-type"
+                value={profile.businessType}
+                onChange={(event) => handleTextChange('businessType', event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="profile-brand-voice">Brand Voice</Label>
+              <Textarea
+                id="profile-brand-voice"
+                value={profile.brandVoice}
+                onChange={(event) => handleTextChange('brandVoice', event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="profile-target-audience">Target Audience</Label>
+              <Textarea
+                id="profile-target-audience"
+                value={profile.targetAudience}
+                onChange={(event) => handleTextChange('targetAudience', event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="profile-core-services">Core Services</Label>
+              <Textarea
+                id="profile-core-services"
+                value={profile.coreServices}
+                onChange={(event) => handleTextChange('coreServices', event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="profile-content-style">Content Style</Label>
+              <Textarea
+                id="profile-content-style"
+                value={profile.contentStyle}
+                onChange={(event) => handleTextChange('contentStyle', event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="profile-primary-offer">Primary Offer</Label>
+              <Input
+                id="profile-primary-offer"
+                value={profile.primaryOffer}
+                onChange={(event) => handleTextChange('primaryOffer', event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="profile-default-platform">Default Platform</Label>
+              <Select
+                id="profile-default-platform"
+                value={profile.defaultPlatform}
+                onChange={(event) =>
+                  handlePlatformChange(event.target.value as DraftPostPlatform)
+                }
+              >
+                {platformOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="profile-notes">Notes</Label>
+            <Textarea
+              id="profile-notes"
+              value={profile.notes ?? ''}
+              onChange={(event) => handleTextChange('notes', event.target.value)}
+            />
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Updated {formatDraftDate(profile.updatedAt)}
+          </p>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -703,6 +884,36 @@ function parseApiError(responseText: string, status: number) {
 
 function readError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function createDefaultBusinessProfile(): BusinessProfile {
+  return {
+    id: 'iron-backs-gym-profile',
+    businessName: 'Iron Backs Gym',
+    businessType: 'Functional fitness gym',
+    brandVoice: 'No-BS, motivating, strong, community-focused',
+    targetAudience:
+      'Adults in Heber City who want strength, conditioning, accountability, and a supportive gym community',
+    coreServices:
+      'Everyday Athlete classes, open gym, personal training, nutrition coaching, youth programs',
+    primaryOffer: 'Free trial for new members',
+    contentStyle: 'Short, energetic, clear call-to-action, community-focused',
+    defaultPlatform: 'instagram',
+    notes: 'Avoid CrossFit terminology. Emphasize functional fitness, strength, grit, and community.',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function buildBrandVoiceContext(profile: BusinessProfile) {
+  return [
+    profile.brandVoice.trim(),
+    profile.targetAudience.trim() ? `Target audience: ${profile.targetAudience.trim()}` : '',
+    profile.coreServices.trim() ? `Core services: ${profile.coreServices.trim()}` : '',
+    profile.contentStyle.trim() ? `Content style: ${profile.contentStyle.trim()}` : '',
+    profile.notes?.trim() ? `Notes: ${profile.notes.trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function createDraftId() {
