@@ -78,7 +78,7 @@ export function BusinessSetupForm() {
                   id="business-name"
                   value={values.name}
                   onChange={(event) => updateValue('name', event.target.value)}
-                  placeholder="Aloha Fence"
+                  placeholder="Iron Backs Gym"
                   required
                 />
               </div>
