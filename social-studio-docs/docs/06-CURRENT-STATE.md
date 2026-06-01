@@ -94,6 +94,7 @@ Phase 3.1 scheduling foundation, Phase 3.2 manual posting queue, and manual post
 - Scheduling controls in the existing Posts editor for approved posts.
 - `/calendar` manual posting queue.
 - Queue tabs for `Upcoming`, `Today`, `Past`, and `Exported`.
+- Today checklist sections for `To Post Today` and `Posted Today`.
 - Queue items grouped by date.
 - Queue item thumbnail, caption preview, scheduled/exported time, status badge, and action controls.
 - View/Edit Post action linking back to the existing Posts editor.
@@ -102,7 +103,8 @@ Phase 3.1 scheduling foundation, Phase 3.2 manual posting queue, and manual post
 - Export/Re-export actions from the queue.
 - Mark Posted action for scheduled and exported queue items.
 - Posted manually completion state with persisted timestamp.
-- Undo posted action that clears `manualPostedAt` while keeping status `exported`.
+- Posted cards have subtle completed styling with a check badge and visible posted timestamp.
+- Undo posted action that restores scheduled items to `scheduled` when `scheduledAt` exists, or keeps unscheduled exported items as `exported`.
 
 ### Preview Validation
 
@@ -113,12 +115,17 @@ The Phase 3 manual posting workflow has been validated in Vercel Preview:
 - Upcoming, Today, Past, and Exported tabs work.
 - Queue items group by date.
 - Queue thumbnails, caption previews, time labels, status badges, and actions display correctly.
+- Today queue separates items into `To Post Today` and `Posted Today`.
 - View/Edit Post, Copy text, Unschedule, Export, and Re-export work.
 - Mark Posted works for scheduled and exported queue items.
 - Scheduled posts marked posted become `exported` and receive server-owned `exportedAt` and `manualPostedAt`.
 - Exported posts can be marked posted without changing status.
-- Undo posted clears `manualPostedAt` and keeps status `exported`.
+- Undo posted on a scheduled-for-today item restores it to `To Post Today`.
+- Undo posted on a future scheduled item restores it to `Upcoming`.
+- Undo posted on an exported unscheduled item keeps it in `Exported`.
+- The Undo posted regression found after Today Queue polish was tested and fixed.
 - Posted manually timestamps persist after refresh.
+- Posted cards show completed styling.
 - Quick Export in `/posts` still works.
 - Exported state persists after refresh.
 
@@ -131,7 +138,7 @@ Manual posting queue path:
 3. Review due content in `/calendar`.
 4. Copy text, export/download the image, and post manually.
 5. Mark the scheduled or exported item posted after manually posting.
-6. Undo posted if the completion marker was set by mistake.
+6. Undo posted if the completion marker was set by mistake; scheduled items return to Today or Upcoming, while unscheduled exported items remain exported.
 7. Re-export exported posts if needed without changing ownership or status rules.
 
 ## Not Yet Built

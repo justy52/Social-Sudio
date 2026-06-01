@@ -28,11 +28,15 @@ Phase 3 manual posting workflow is validated in Vercel Preview. Social Studio no
 - Export downloads the final edited image when available, falls back to the original image, copies caption text, and persists the exported state.
 - Scheduling works for approved posts, including unscheduling and exporting scheduled posts.
 - `/calendar` provides a manual posting queue with `Upcoming`, `Today`, `Past`, and `Exported` tabs.
+- The Today queue is a daily checklist with `To Post Today` and `Posted Today` sections.
 - Queue items group by date and show thumbnail, caption preview, scheduled/exported time, status, and actions.
 - View/Edit Post, Copy text, Unschedule, Export, Re-export, Mark Posted, and Undo posted work from the queue.
 - `manual_posted_at` tracks manual posting completion without adding a new post status.
 - Scheduled posts marked posted become `exported` and receive server-owned `exportedAt` and `manualPostedAt` timestamps.
-- Exported posts can be marked posted without changing status, and Undo posted clears `manualPostedAt` while keeping status `exported`.
+- Undo posted restores scheduled items back to Today or Upcoming when `scheduledAt` exists.
+- Undo posted on exported unscheduled items clears `manualPostedAt` while keeping status `exported`.
+- Posted cards use a subtle completed style with a check badge and visible posted timestamp.
+- The manual posting checklist and Undo posted regression fix are validated in browser retest.
 - Direct publishing, cron/email reminders, analytics, billing, teams, ads, video, and templates are still out of scope/not built.
 
 See [`PHASE1_VALIDATION.md`](PHASE1_VALIDATION.md) and [`PHASE2_SCHEMA_PLAN.md`](PHASE2_SCHEMA_PLAN.md).
