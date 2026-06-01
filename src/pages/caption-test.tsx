@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Check, Copy, Sparkles } from 'lucide-react';
+import { Check, Copy, Sparkles, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -157,6 +157,12 @@ export function CaptionTestPage() {
       currentDrafts.map((draftPost) =>
         draftPost.id === draftId ? { ...draftPost, status } : draftPost,
       ),
+    );
+  }
+
+  function handleRemoveDraft(draftId: string) {
+    setDraftPosts((currentDrafts) =>
+      currentDrafts.filter((draftPost) => draftPost.id !== draftId),
     );
   }
 
@@ -365,6 +371,7 @@ export function CaptionTestPage() {
         <TemporaryDraftPosts
           draftPosts={draftPosts}
           onStatusChange={handleDraftStatusChange}
+          onRemove={handleRemoveDraft}
         />
       </div>
     </main>
@@ -374,9 +381,11 @@ export function CaptionTestPage() {
 function TemporaryDraftPosts({
   draftPosts,
   onStatusChange,
+  onRemove,
 }: {
   draftPosts: DraftPost[];
   onStatusChange: (draftId: string, status: DraftPostStatus) => void;
+  onRemove: (draftId: string) => void;
 }) {
   return (
     <section className="space-y-3">
@@ -415,7 +424,18 @@ function TemporaryDraftPosts({
                       {draftPost.businessName} - {formatPlatform(draftPost.platform)}
                     </CardDescription>
                   </div>
-                  <Badge>{draftStatusLabels[draftPost.status]}</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{draftStatusLabels[draftPost.status]}</Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemove(draftPost.id)}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
