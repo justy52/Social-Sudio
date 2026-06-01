@@ -43,6 +43,12 @@ type DraftEditFormState = {
   tone: string;
 };
 
+type DraftStatusFilter = 'all' | DraftPostStatus;
+
+type DraftPlatformFilter = 'all' | DraftPostPlatform;
+
+type DraftSortOrder = 'newest' | 'oldest';
+
 type BusinessProfileTextField =
   | 'businessName'
   | 'businessType'
@@ -90,6 +96,23 @@ const draftStatusStyles: Record<DraftPostStatus, string> = {
   needs_review: 'border-accent/30 bg-accent/10 text-accent',
   approved: 'border-primary/30 bg-primary/10 text-primary',
 };
+
+const draftStatusFilterOptions: { value: DraftStatusFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'needs_review', label: 'Needs Review' },
+  { value: 'approved', label: 'Approved / Export Ready' },
+];
+
+const draftPlatformFilterOptions: { value: DraftPlatformFilter; label: string }[] = [
+  { value: 'all', label: 'All Platforms' },
+  ...platformOptions,
+];
+
+const draftSortOptions: { value: DraftSortOrder; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+];
 
 const manualPostingChecklist = [
   'Copy caption',
@@ -782,6 +805,16 @@ function TemporaryDraftReview({
   onStatusChange: (draftId: string, status: DraftPostStatus) => void;
   onUpdateDraft: (draftId: string, input: DraftEditFormState) => void;
 }) {
+  const [statusFilter, setStatusFilter] = useState<DraftStatusFilter>('all');
+  const [platformFilter, setPlatformFilter] = useState<DraftPlatformFilter>('all');
+  const [sortOrder, setSortOrder] = useState<DraftSortOrder>('newest');
+  const visibleDraftPosts = getVisibleDraftPosts(
+    draftPosts,
+    statusFilter,
+    platformFilter,
+    sortOrder,
+  );
+
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -803,6 +836,61 @@ function TemporaryDraftReview({
         <SummaryStat label="Approved" value={summary.approved} />
       </div>
 
+      {draftPosts.length > 0 && (
+        <div className="rounded-md border border-border bg-card p-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="draft-status-filter">Status</Label>
+              <Select
+                id="draft-status-filter"
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as DraftStatusFilter)
+                }
+              >
+                {draftStatusFilterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="draft-platform-filter">Platform</Label>
+              <Select
+                id="draft-platform-filter"
+                value={platformFilter}
+                onChange={(event) =>
+                  setPlatformFilter(event.target.value as DraftPlatformFilter)
+                }
+              >
+                {draftPlatformFilterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="draft-sort-order">Sort</Label>
+              <Select
+                id="draft-sort-order"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value as DraftSortOrder)}
+              >
+                {draftSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
+
       {draftPosts.length === 0 ? (
         <Card>
           <CardHeader>
@@ -810,21 +898,38 @@ function TemporaryDraftReview({
             <CardDescription>Save a generated caption to start reviewing drafts.</CardDescription>
           </CardHeader>
         </Card>
+      ) : visibleDraftPosts.length === 0 ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Showing 0 of {draftPosts.length} drafts
+          </p>
+          <Card>
+            <CardHeader>
+              <CardTitle>No drafts match these filters.</CardTitle>
+              <CardDescription>Adjust filters to see saved drafts.</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {draftPosts.map((draftPost) => (
-            <DraftReviewCard
-              key={draftPost.id}
-              copiedDraftId={copiedDraftId}
-              copiedExportDraftId={copiedExportDraftId}
-              draftPost={draftPost}
-              onCopyDraft={onCopyDraft}
-              onCopyExportText={onCopyExportText}
-              onRemove={onRemove}
-              onStatusChange={onStatusChange}
-              onUpdateDraft={onUpdateDraft}
-            />
-          ))}
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Showing {visibleDraftPosts.length} of {draftPosts.length} drafts
+          </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {visibleDraftPosts.map((draftPost) => (
+              <DraftReviewCard
+                key={draftPost.id}
+                copiedDraftId={copiedDraftId}
+                copiedExportDraftId={copiedExportDraftId}
+                draftPost={draftPost}
+                onCopyDraft={onCopyDraft}
+                onCopyExportText={onCopyExportText}
+                onRemove={onRemove}
+                onStatusChange={onStatusChange}
+                onUpdateDraft={onUpdateDraft}
+              />
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -1246,6 +1351,39 @@ function parseHashtagsInput(value: string) {
     .map((hashtag) => hashtag.trim())
     .filter(Boolean)
     .map((hashtag) => (hashtag.startsWith('#') ? hashtag : `#${hashtag}`));
+}
+
+function getVisibleDraftPosts(
+  draftPosts: DraftPost[],
+  statusFilter: DraftStatusFilter,
+  platformFilter: DraftPlatformFilter,
+  sortOrder: DraftSortOrder,
+) {
+  return draftPosts
+    .filter((draftPost) => matchesDraftFilters(draftPost, statusFilter, platformFilter))
+    .sort((firstDraft, secondDraft) => {
+      const firstTime = getDraftCreatedTime(firstDraft);
+      const secondTime = getDraftCreatedTime(secondDraft);
+
+      return sortOrder === 'newest' ? secondTime - firstTime : firstTime - secondTime;
+    });
+}
+
+function matchesDraftFilters(
+  draftPost: DraftPost,
+  statusFilter: DraftStatusFilter,
+  platformFilter: DraftPlatformFilter,
+) {
+  const matchesStatus = statusFilter === 'all' || draftPost.status === statusFilter;
+  const matchesPlatform = platformFilter === 'all' || draftPost.platform === platformFilter;
+
+  return matchesStatus && matchesPlatform;
+}
+
+function getDraftCreatedTime(draftPost: DraftPost) {
+  const timestamp = new Date(draftPost.createdAt).getTime();
+
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
 function buildManualExportText(draftPost: DraftPost) {
