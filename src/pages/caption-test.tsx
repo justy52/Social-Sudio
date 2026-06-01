@@ -8,7 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { BusinessProfile, DraftPost, DraftPostPlatform, DraftPostStatus } from '@/types';
+import type {
+  BusinessProfile,
+  ContentIdea,
+  ContentIdeaGenerateResponse,
+  DraftPost,
+  DraftPostPlatform,
+  DraftPostStatus,
+} from '@/types';
 
 type CaptionTestFormState = {
   businessName: string;
@@ -67,6 +74,8 @@ const defaultForm: CaptionTestFormState = {
   mediaDescription: 'Video of members lifting, doing sled pushes, and high-fiving after class',
   platform: 'instagram',
 };
+
+const defaultIdeaGoal = 'Create post ideas that promote a free trial and show the gym community.';
 
 const platformOptions: { value: DraftPostPlatform; label: string }[] = [
   { value: 'instagram', label: 'Instagram' },
@@ -133,6 +142,11 @@ export function CaptionTestPage() {
     loadStoredBusinessProfile(),
   );
   const [form, setForm] = useState<CaptionTestFormState>(defaultForm);
+  const [ideaGoal, setIdeaGoal] = useState(defaultIdeaGoal);
+  const [ideaResult, setIdeaResult] = useState<ContentIdeaGenerateResponse | null>(null);
+  const [ideaError, setIdeaError] = useState<string | null>(null);
+  const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
+  const [usedIdeaTitle, setUsedIdeaTitle] = useState<string | null>(null);
   const [result, setResult] = useState<CaptionGenerateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,6 +173,44 @@ export function CaptionTestPage() {
 
     setLocalStorageJson(storageKeys.draftPosts, draftPosts);
   }, [draftPosts]);
+
+  async function handleGenerateIdeas() {
+    setIsGeneratingIdeas(true);
+    setIdeaError(null);
+    setUsedIdeaTitle(null);
+
+    try {
+      const response = await fetch('/api/ai/generate-content-ideas', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          businessName: businessProfile.businessName.trim(),
+          businessType: businessProfile.businessType.trim(),
+          brandVoice: businessProfile.brandVoice.trim() || undefined,
+          targetAudience: businessProfile.targetAudience.trim() || undefined,
+          coreServices: businessProfile.coreServices.trim() || undefined,
+          primaryOffer: businessProfile.primaryOffer.trim() || undefined,
+          contentStyle: businessProfile.contentStyle.trim() || undefined,
+          notes: businessProfile.notes?.trim() || undefined,
+          platform: businessProfile.defaultPlatform,
+          ideaGoal: ideaGoal.trim() || undefined,
+        }),
+      });
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        throw new Error(parseApiError(responseText, response.status));
+      }
+
+      setIdeaResult(parseContentIdeaResponse(responseText));
+    } catch (generateError) {
+      setIdeaError(readError(generateError, 'Could not generate content ideas.'));
+    } finally {
+      setIsGeneratingIdeas(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -338,6 +390,20 @@ export function CaptionTestPage() {
     setError(null);
   }
 
+  function handleUseIdeaForCaption(idea: ContentIdea) {
+    setForm((currentForm) => ({
+      ...currentForm,
+      businessName: businessProfile.businessName,
+      businessType: businessProfile.businessType,
+      brandVoice: businessProfile.brandVoice,
+      postGoal: idea.callToAction || idea.title,
+      mediaDescription: buildIdeaCaptionContext(currentForm.mediaDescription, businessProfile, idea),
+      platform: idea.platform,
+    }));
+    setUsedIdeaTitle(idea.title);
+    setError(null);
+  }
+
   const captions = result?.captions ?? [];
   const draftSummary = getDraftSummary(draftPosts);
 
@@ -359,6 +425,17 @@ export function CaptionTestPage() {
           onChange={setBusinessProfile}
           onResetProfile={handleResetBusinessProfile}
           onUseProfile={handleUseProfileForCaptionInputs}
+        />
+
+        <ContentIdeas
+          ideaError={ideaError}
+          ideaGoal={ideaGoal}
+          ideaResult={ideaResult}
+          isGeneratingIdeas={isGeneratingIdeas}
+          usedIdeaTitle={usedIdeaTitle}
+          onGenerateIdeas={handleGenerateIdeas}
+          onIdeaGoalChange={setIdeaGoal}
+          onUseIdeaForCaption={handleUseIdeaForCaption}
         />
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
@@ -551,6 +628,116 @@ function BusinessProfileMemory({
           <p className="text-xs text-muted-foreground">
             Updated {formatDraftDate(profile.updatedAt)}
           </p>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function ContentIdeas({
+  ideaError,
+  ideaGoal,
+  ideaResult,
+  isGeneratingIdeas,
+  usedIdeaTitle,
+  onGenerateIdeas,
+  onIdeaGoalChange,
+  onUseIdeaForCaption,
+}: {
+  ideaError: string | null;
+  ideaGoal: string;
+  ideaResult: ContentIdeaGenerateResponse | null;
+  isGeneratingIdeas: boolean;
+  usedIdeaTitle: string | null;
+  onGenerateIdeas: () => void;
+  onIdeaGoalChange: (value: string) => void;
+  onUseIdeaForCaption: (idea: ContentIdea) => void;
+}) {
+  const ideas = ideaResult?.ideas ?? [];
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <SectionHeading
+          title="Content Ideas"
+          description="Generate post ideas from your business profile before writing captions."
+        />
+        <Button type="button" onClick={onGenerateIdeas} disabled={isGeneratingIdeas}>
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+          {isGeneratingIdeas ? 'Generating Ideas' : 'Generate Ideas'}
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="space-y-2">
+            <Label htmlFor="idea-goal">Idea Goal</Label>
+            <Input
+              id="idea-goal"
+              value={ideaGoal}
+              onChange={(event) => onIdeaGoalChange(event.target.value)}
+            />
+          </div>
+
+          {ideaError && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {ideaError}
+            </div>
+          )}
+
+          {isGeneratingIdeas ? (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              Generating ideas from the current business profile.
+            </div>
+          ) : ideaResult && ideas.length === 0 ? (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              No content ideas returned.
+            </div>
+          ) : ideas.length > 0 ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {ideas.map((idea) => (
+                <Card key={`${idea.title}-${idea.platform}`}>
+                  <CardHeader>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <CardTitle>{idea.title}</CardTitle>
+                        <CardDescription>{idea.angle}</CardDescription>
+                      </div>
+                      <Badge>{formatPlatform(idea.platform)}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <MetadataBlock
+                      label="Suggested Caption Prompt"
+                      value={idea.suggestedCaptionPrompt}
+                    />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <MetadataBlock label="Content type" value={idea.contentType} />
+                      <MetadataBlock label="Call to action" value={idea.callToAction} />
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => onUseIdeaForCaption(idea)}
+                    >
+                      {usedIdeaTitle === idea.title ? (
+                        <Check className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" aria-hidden="true" />
+                      )}
+                      {usedIdeaTitle === idea.title ? 'Idea Applied' : 'Use Idea for Caption'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              Generate ideas to plan a post before creating captions.
+            </div>
+          )}
         </CardContent>
       </Card>
     </section>
@@ -1288,6 +1475,22 @@ function parseCaptionResponse(responseText: string): CaptionGenerateResponse {
   return parsed;
 }
 
+function parseContentIdeaResponse(responseText: string): ContentIdeaGenerateResponse {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(responseText);
+  } catch {
+    throw new Error('The API returned invalid JSON.');
+  }
+
+  if (!isContentIdeaGenerateResponse(parsed)) {
+    throw new Error('The API returned an unexpected content idea response.');
+  }
+
+  return parsed;
+}
+
 function isCaptionGenerateResponse(value: unknown): value is CaptionGenerateResponse {
   if (!value || typeof value !== 'object' || !('captions' in value)) {
     return false;
@@ -1311,6 +1514,33 @@ function isCaptionDraft(value: unknown): value is CaptionDraft {
     typeof draft.tone === 'string' &&
     Array.isArray(draft.hashtags) &&
     draft.hashtags.every((hashtag) => typeof hashtag === 'string')
+  );
+}
+
+function isContentIdeaGenerateResponse(value: unknown): value is ContentIdeaGenerateResponse {
+  if (!value || typeof value !== 'object' || !('ideas' in value)) {
+    return false;
+  }
+
+  const ideas = (value as { ideas: unknown }).ideas;
+
+  return Array.isArray(ideas) && ideas.every(isContentIdea);
+}
+
+function isContentIdea(value: unknown): value is ContentIdea {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const idea = value as Record<string, unknown>;
+
+  return (
+    typeof idea.title === 'string' &&
+    typeof idea.angle === 'string' &&
+    typeof idea.suggestedCaptionPrompt === 'string' &&
+    isDraftPostPlatform(idea.platform) &&
+    typeof idea.contentType === 'string' &&
+    typeof idea.callToAction === 'string'
   );
 }
 
@@ -1599,15 +1829,8 @@ function buildMediaDescriptionContext(
   currentMediaDescription: string,
   profile: BusinessProfile,
 ) {
-  const mediaDescription = removeProfileContext(currentMediaDescription);
-  const profileContext = [
-    profile.targetAudience.trim() ? `Audience: ${profile.targetAudience.trim()}` : '',
-    profile.coreServices.trim() ? `Core services: ${profile.coreServices.trim()}` : '',
-    profile.contentStyle.trim() ? `Content style: ${profile.contentStyle.trim()}` : '',
-    profile.notes?.trim() ? `Notes: ${profile.notes.trim()}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const mediaDescription = removeGeneratedContext(currentMediaDescription);
+  const profileContext = buildProfileContext(profile);
 
   if (!profileContext) {
     return mediaDescription;
@@ -1616,14 +1839,56 @@ function buildMediaDescriptionContext(
   return [mediaDescription, `Profile context:\n${profileContext}`].filter(Boolean).join('\n\n');
 }
 
-function removeProfileContext(value: string) {
-  const markerIndex = value.indexOf('Profile context:');
+function buildIdeaCaptionContext(
+  currentMediaDescription: string,
+  profile: BusinessProfile,
+  idea: ContentIdea,
+) {
+  const mediaDescription = removeGeneratedContext(currentMediaDescription);
+  const ideaContext = [
+    `Idea title: ${idea.title}`,
+    `Angle: ${idea.angle}`,
+    `Suggested caption prompt: ${idea.suggestedCaptionPrompt}`,
+    `Content type: ${idea.contentType}`,
+  ].join('\n');
+  const profileContext = buildProfileContext(profile);
+
+  return [
+    mediaDescription,
+    `Idea context:\n${ideaContext}`,
+    profileContext ? `Profile context:\n${profileContext}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function buildProfileContext(profile: BusinessProfile) {
+  return [
+    profile.targetAudience.trim() ? `Audience: ${profile.targetAudience.trim()}` : '',
+    profile.coreServices.trim() ? `Core services: ${profile.coreServices.trim()}` : '',
+    profile.contentStyle.trim() ? `Content style: ${profile.contentStyle.trim()}` : '',
+    profile.notes?.trim() ? `Notes: ${profile.notes.trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function removeGeneratedContext(value: string) {
+  const markerIndex = findFirstContextMarkerIndex(value);
 
   if (markerIndex === -1) {
     return value.trim();
   }
 
   return value.slice(0, markerIndex).trim();
+}
+
+function findFirstContextMarkerIndex(value: string) {
+  const indexes = ['Idea context:', 'Profile context:']
+    .map((marker) => value.indexOf(marker))
+    .filter((index) => index >= 0);
+
+  return indexes.length > 0 ? Math.min(...indexes) : -1;
 }
 
 function createDefaultBusinessProfile(): BusinessProfile {

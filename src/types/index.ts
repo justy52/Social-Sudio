@@ -26,7 +26,9 @@ export interface BusinessFormValues {
   timezone?: string;
 }
 
-export type DraftPostPlatform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin';
+export const draftPostPlatforms = ['instagram', 'facebook', 'tiktok', 'linkedin'] as const;
+
+export type DraftPostPlatform = (typeof draftPostPlatforms)[number];
 
 export type DraftPostStatus = 'draft' | 'needs_review' | 'approved';
 
@@ -56,4 +58,30 @@ export type DraftPost = {
   tone: string;
   status: DraftPostStatus;
   createdAt: string;
+};
+
+export type ContentIdea = {
+  title: string;
+  angle: string;
+  suggestedCaptionPrompt: string;
+  platform: DraftPostPlatform;
+  contentType: string;
+  callToAction: string;
+};
+
+export type ContentIdeaGenerateRequest = {
+  businessName: string;
+  businessType: string;
+  brandVoice?: string;
+  targetAudience?: string;
+  coreServices?: string;
+  primaryOffer?: string;
+  contentStyle?: string;
+  notes?: string;
+  platform?: DraftPostPlatform;
+  ideaGoal?: string;
+};
+
+export type ContentIdeaGenerateResponse = {
+  ideas: ContentIdea[];
 };
