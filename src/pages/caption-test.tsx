@@ -18,6 +18,7 @@ import type {
   DraftPostMediaType,
   DraftPostPlatform,
   DraftPostStatus,
+  DraftTemplate,
 } from '@/types';
 
 type CaptionTestFormState = {
@@ -82,6 +83,89 @@ const defaultForm: CaptionTestFormState = {
 };
 
 const defaultIdeaGoal = 'Create post ideas that promote a free trial and show the gym community.';
+
+const draftTemplates = [
+  {
+    id: 'free-trial-promo',
+    name: 'Free Trial Promo',
+    description: 'Invite new customers to try the business with a clear, low-friction offer.',
+    defaultPlatform: 'instagram',
+    ideaGoal: 'Create post ideas that promote a free trial and make it easy for new people to start.',
+    postGoal: 'Promote a free trial for new customers',
+    mediaType: 'reel',
+    mediaPrompt: 'Short clips of real people using the service, smiling, and taking the first step.',
+  },
+  {
+    id: 'behind-the-scenes',
+    name: 'Behind the Scenes',
+    description: 'Show the work, prep, team energy, and daily process behind the business.',
+    defaultPlatform: 'instagram',
+    ideaGoal: 'Create behind-the-scenes post ideas that make the business feel real, trusted, and human.',
+    postGoal: 'Show behind-the-scenes culture and daily work',
+    mediaType: 'video',
+    mediaPrompt: 'Candid clips of staff preparing, coaching, cleaning, setting up, or helping customers.',
+  },
+  {
+    id: 'customer-spotlight',
+    name: 'Member / Customer Spotlight',
+    description: 'Celebrate a customer story, win, transformation, or milestone.',
+    defaultPlatform: 'facebook',
+    ideaGoal: 'Create customer spotlight ideas that celebrate progress and community without feeling scripted.',
+    postGoal: 'Highlight a member or customer story',
+    mediaType: 'photo',
+    mediaPrompt: 'Portrait or action photo of the featured person, plus a natural moment with the team.',
+  },
+  {
+    id: 'educational-tip',
+    name: 'Educational Tip',
+    description: 'Teach one useful thing that helps the audience make better decisions.',
+    defaultPlatform: 'linkedin',
+    ideaGoal: 'Create educational post ideas with one practical tip the audience can use right away.',
+    postGoal: 'Share a useful educational tip',
+    mediaType: 'carousel',
+    mediaPrompt: 'Simple step-by-step visuals, a short demo, or a before-and-after explanation.',
+  },
+  {
+    id: 'event-reminder',
+    name: 'Event Reminder',
+    description: 'Remind people about an upcoming class, event, deadline, or community moment.',
+    defaultPlatform: 'facebook',
+    ideaGoal: 'Create event reminder ideas that drive attendance and make the event feel worth showing up for.',
+    postGoal: 'Remind the audience about an upcoming event',
+    mediaType: 'story',
+    mediaPrompt: 'Event flyer, quick host video, or photos from a previous event with clear details.',
+  },
+  {
+    id: 'community-culture',
+    name: 'Community / Culture Post',
+    description: 'Show the values, people, and atmosphere that make the business different.',
+    defaultPlatform: 'instagram',
+    ideaGoal: 'Create community-focused post ideas that show belonging, energy, and shared values.',
+    postGoal: 'Show the business community and culture',
+    mediaType: 'reel',
+    mediaPrompt: 'Fast cuts of people interacting, supporting each other, celebrating, or working together.',
+  },
+  {
+    id: 'limited-time-offer',
+    name: 'Limited-Time Offer',
+    description: 'Create urgency around a short-term promotion without sounding pushy.',
+    defaultPlatform: 'instagram',
+    ideaGoal: 'Create limited-time offer ideas with urgency, clarity, and a direct call to action.',
+    postGoal: 'Promote a limited-time offer',
+    mediaType: 'photo',
+    mediaPrompt: 'Offer graphic, product or service shot, or quick video explaining what expires and when.',
+  },
+  {
+    id: 'testimonial-review',
+    name: 'Testimonial / Review',
+    description: 'Turn a review or customer quote into trust-building social proof.',
+    defaultPlatform: 'linkedin',
+    ideaGoal: 'Create testimonial post ideas that use social proof to build trust and encourage action.',
+    postGoal: 'Share a testimonial or review',
+    mediaType: 'photo',
+    mediaPrompt: 'Customer quote graphic, happy customer photo, or simple video reaction from the team.',
+  },
+] satisfies DraftTemplate[];
 
 const platformOptions: { value: DraftPostPlatform; label: string }[] = [
   { value: 'instagram', label: 'Instagram' },
@@ -187,10 +271,16 @@ export function CaptionTestPage() {
   );
   const [form, setForm] = useState<CaptionTestFormState>(defaultForm);
   const [ideaGoal, setIdeaGoal] = useState(defaultIdeaGoal);
+  const [ideaPlatform, setIdeaPlatform] = useState<DraftPostPlatform>(
+    businessProfile.defaultPlatform,
+  );
   const [ideaResult, setIdeaResult] = useState<ContentIdeaGenerateResponse | null>(null);
   const [ideaError, setIdeaError] = useState<string | null>(null);
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [usedIdeaTitle, setUsedIdeaTitle] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedTemplateMediaType, setSelectedTemplateMediaType] =
+    useState<DraftPostMediaType | null>(null);
   const [result, setResult] = useState<CaptionGenerateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -238,7 +328,7 @@ export function CaptionTestPage() {
           primaryOffer: businessProfile.primaryOffer.trim() || undefined,
           contentStyle: businessProfile.contentStyle.trim() || undefined,
           notes: businessProfile.notes?.trim() || undefined,
-          platform: businessProfile.defaultPlatform,
+          platform: ideaPlatform,
           ideaGoal: ideaGoal.trim() || undefined,
         }),
       });
@@ -324,14 +414,16 @@ export function CaptionTestPage() {
     }
 
     const mediaDescription = form.mediaDescription.trim();
-    const mediaNotes = removeGeneratedContext(mediaDescription);
+    const selectedTemplate = getDraftTemplateById(selectedTemplateId);
+    const mediaNotes =
+      removeGeneratedContext(mediaDescription) || selectedTemplate?.mediaPrompt || '';
     const draftPost: DraftPost = {
       id: createDraftId(),
       businessName,
       businessType,
       platform: form.platform,
       ...(mediaDescription ? { mediaDescription } : {}),
-      mediaType: getDefaultMediaTypeForPlatform(form.platform),
+      mediaType: selectedTemplateMediaType ?? getDefaultMediaTypeForPlatform(form.platform),
       ...(mediaNotes ? { mediaNotes } : {}),
       assetStatus: 'needed',
       caption: caption.caption,
@@ -438,7 +530,39 @@ export function CaptionTestPage() {
       ),
       platform: businessProfile.defaultPlatform,
     }));
+    setSelectedTemplateId(null);
+    setSelectedTemplateMediaType(null);
     setError(null);
+  }
+
+  function handleUseTemplateForIdeas(template: DraftTemplate) {
+    setIdeaGoal(template.ideaGoal);
+    setIdeaPlatform(template.defaultPlatform);
+    setSelectedTemplateId(template.id);
+    setSelectedTemplateMediaType(template.mediaType);
+    setIdeaResult(null);
+    setIdeaError(null);
+    setUsedIdeaTitle(null);
+  }
+
+  function handleUseTemplateForCaption(template: DraftTemplate) {
+    setForm((currentForm) => ({
+      ...currentForm,
+      businessName: businessProfile.businessName,
+      businessType: businessProfile.businessType,
+      brandVoice: businessProfile.brandVoice,
+      postGoal: template.postGoal,
+      mediaDescription: buildTemplateCaptionContext(
+        currentForm.mediaDescription,
+        businessProfile,
+        template,
+      ),
+      platform: template.defaultPlatform,
+    }));
+    setSelectedTemplateId(template.id);
+    setSelectedTemplateMediaType(template.mediaType);
+    setError(null);
+    setUsedIdeaTitle(null);
   }
 
   function handleUseIdeaForCaption(idea: ContentIdea) {
@@ -478,14 +602,23 @@ export function CaptionTestPage() {
           onUseProfile={handleUseProfileForCaptionInputs}
         />
 
+        <DraftTemplates
+          selectedTemplateId={selectedTemplateId}
+          templates={draftTemplates}
+          onUseForCaption={handleUseTemplateForCaption}
+          onUseForIdeas={handleUseTemplateForIdeas}
+        />
+
         <ContentIdeas
           ideaError={ideaError}
           ideaGoal={ideaGoal}
+          ideaPlatform={ideaPlatform}
           ideaResult={ideaResult}
           isGeneratingIdeas={isGeneratingIdeas}
           usedIdeaTitle={usedIdeaTitle}
           onGenerateIdeas={handleGenerateIdeas}
           onIdeaGoalChange={setIdeaGoal}
+          onIdeaPlatformChange={setIdeaPlatform}
           onUseIdeaForCaption={handleUseIdeaForCaption}
         />
 
@@ -685,23 +818,105 @@ function BusinessProfileMemory({
   );
 }
 
+function DraftTemplates({
+  selectedTemplateId,
+  templates,
+  onUseForCaption,
+  onUseForIdeas,
+}: {
+  selectedTemplateId: string | null;
+  templates: DraftTemplate[];
+  onUseForCaption: (template: DraftTemplate) => void;
+  onUseForIdeas: (template: DraftTemplate) => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeading
+        title="Draft Templates"
+        description="Start from a common post type, then generate ideas or captions from your business profile."
+      />
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {templates.map((template) => {
+          const isSelected = selectedTemplateId === template.id;
+
+          return (
+            <Card
+              key={template.id}
+              className={cn(isSelected ? 'border-primary/40' : '')}
+            >
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle>{template.name}</CardTitle>
+                    <CardDescription>{template.description}</CardDescription>
+                  </div>
+                  {isSelected && (
+                    <Badge className="border-primary/30 bg-primary/10 text-primary">
+                      Selected
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetadataBlock
+                    label="Default platform"
+                    value={formatPlatform(template.defaultPlatform)}
+                  />
+                  <MetadataBlock
+                    label="Suggested media type"
+                    value={mediaTypeLabels[template.mediaType]}
+                  />
+                </div>
+
+                <MetadataBlock label="Media prompt" value={template.mediaPrompt} />
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onUseForIdeas(template)}
+                  >
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    Use for Ideas
+                  </Button>
+                  <Button type="button" size="sm" onClick={() => onUseForCaption(template)}>
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    Use for Caption
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ContentIdeas({
   ideaError,
   ideaGoal,
+  ideaPlatform,
   ideaResult,
   isGeneratingIdeas,
   usedIdeaTitle,
   onGenerateIdeas,
   onIdeaGoalChange,
+  onIdeaPlatformChange,
   onUseIdeaForCaption,
 }: {
   ideaError: string | null;
   ideaGoal: string;
+  ideaPlatform: DraftPostPlatform;
   ideaResult: ContentIdeaGenerateResponse | null;
   isGeneratingIdeas: boolean;
   usedIdeaTitle: string | null;
   onGenerateIdeas: () => void;
   onIdeaGoalChange: (value: string) => void;
+  onIdeaPlatformChange: (platform: DraftPostPlatform) => void;
   onUseIdeaForCaption: (idea: ContentIdea) => void;
 }) {
   const ideas = ideaResult?.ideas ?? [];
@@ -721,13 +936,32 @@ function ContentIdeas({
 
       <Card>
         <CardContent className="space-y-4 p-5">
-          <div className="space-y-2">
-            <Label htmlFor="idea-goal">Idea Goal</Label>
-            <Input
-              id="idea-goal"
-              value={ideaGoal}
-              onChange={(event) => onIdeaGoalChange(event.target.value)}
-            />
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="space-y-2">
+              <Label htmlFor="idea-goal">Idea Goal</Label>
+              <Input
+                id="idea-goal"
+                value={ideaGoal}
+                onChange={(event) => onIdeaGoalChange(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="idea-platform">Platform</Label>
+              <Select
+                id="idea-platform"
+                value={ideaPlatform}
+                onChange={(event) =>
+                  onIdeaPlatformChange(event.target.value as DraftPostPlatform)
+                }
+              >
+                {platformOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
 
           {ideaError && (
@@ -1714,6 +1948,10 @@ function parseHashtagsInput(value: string) {
     .map((hashtag) => (hashtag.startsWith('#') ? hashtag : `#${hashtag}`));
 }
 
+function getDraftTemplateById(templateId: string | null) {
+  return draftTemplates.find((template) => template.id === templateId);
+}
+
 function getDefaultMediaTypeForPlatform(platform: DraftPostPlatform): DraftPostMediaType {
   return platform === 'instagram' || platform === 'tiktok' ? 'reel' : 'photo';
 }
@@ -2030,6 +2268,29 @@ function buildIdeaCaptionContext(
     .join('\n\n');
 }
 
+function buildTemplateCaptionContext(
+  currentMediaDescription: string,
+  profile: BusinessProfile,
+  template: DraftTemplate,
+) {
+  const mediaDescription = removeGeneratedContext(currentMediaDescription);
+  const templateContext = [
+    `Template: ${template.name}`,
+    `Description: ${template.description}`,
+    `Media prompt: ${template.mediaPrompt}`,
+    `Suggested media type: ${mediaTypeLabels[template.mediaType]}`,
+  ].join('\n');
+  const profileContext = buildProfileContext(profile);
+
+  return [
+    mediaDescription,
+    `Template context:\n${templateContext}`,
+    profileContext ? `Profile context:\n${profileContext}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 function buildProfileContext(profile: BusinessProfile) {
   return [
     profile.targetAudience.trim() ? `Audience: ${profile.targetAudience.trim()}` : '',
@@ -2052,7 +2313,7 @@ function removeGeneratedContext(value: string) {
 }
 
 function findFirstContextMarkerIndex(value: string) {
-  const indexes = ['Idea context:', 'Profile context:']
+  const indexes = ['Template context:', 'Idea context:', 'Profile context:']
     .map((marker) => value.indexOf(marker))
     .filter((index) => index >= 0);
 

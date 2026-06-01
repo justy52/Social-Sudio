@@ -71,6 +71,17 @@ export type DraftPost = {
   createdAt: string;
 };
 
+export type DraftTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  defaultPlatform: DraftPostPlatform;
+  ideaGoal: string;
+  postGoal: string;
+  mediaType: NonNullable<DraftPost['mediaType']>;
+  mediaPrompt: string;
+};
+
 export type ContentIdea = {
   title: string;
   angle: string;
