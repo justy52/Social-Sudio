@@ -8,7 +8,7 @@
 
 **Scope boundary:** This phase adds scheduling UI and a calendar/manual posting queue. It does NOT add direct social publishing or automated cron jobs. Users still export and manually post. Email reminders are optional Phase 3.5+ and should only be built after the core calendar/manual posting workflow is complete.
 
-**Current status:** Phase 3.1 scheduling foundation, Phase 3.2 manual posting queue, manual posted completion tracking, Today Queue checklist polish, and Phase 3.3 dashboard data are implemented and tested. The dashboard now shows database-backed metrics, recent activity, and upcoming scheduled posts. The current `/calendar` implementation is a simple queue/list view with `Upcoming`, `Today`, `Past`, and `Exported` tabs. A full drag-and-drop monthly calendar grid is not built yet.
+**Current status:** Phase 3 MVP is complete and validated in Vercel Preview. Phase 3.1 scheduling foundation, Phase 3.2 manual posting queue, manual posted completion tracking, Today Queue checklist polish, and Phase 3.3 dashboard data are implemented and tested. The dashboard now shows database-backed metrics, recent activity, and upcoming scheduled posts. The current `/calendar` implementation is a simple queue/list view with `Upcoming`, `Today`, `Past`, and `Exported` tabs. A full drag-and-drop monthly calendar grid is not built yet.
 
 ---
 
@@ -108,7 +108,7 @@ Upcoming: next 5 scheduled posts with "Export" shortcut.
 - [x] Manual posting checklist is validated
 - [x] Undo posted restores scheduled items without adding a new status
 - [x] Dashboard shows real stats
-- [x] Phase 3.1, 3.2, manual posted completion, and Today Queue polish work in Vercel Preview
+- [x] Phase 3.1, 3.2, 3.3, manual posted completion, and Today Queue polish work in Vercel Preview
 - [x] **Social Studio is now a lean daily content management tool for manual posting**
 
 ---

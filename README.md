@@ -15,7 +15,7 @@ Start with the planning docs at [`social-studio-docs/README.md`](social-studio-d
 
 ## Current Status
 
-Phase 3 manual posting workflow is validated in Vercel Preview. Social Studio now supports the core create, schedule, queue, export, manual-post, and posted-completion workflow.
+Phase 3 MVP is complete and validated in Vercel Preview. Social Studio now supports the core create, schedule, queue, export, manual-post, posted-completion, and dashboard workflow.
 
 - Workspace loading works in Preview.
 - Draft creation, selection, editing, and persistence work.
