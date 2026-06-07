@@ -15,7 +15,7 @@ const prototypeWorkflow = [
 
 export function HomePage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-transparent text-foreground">
       <PrototypeNav />
 
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">

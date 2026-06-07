@@ -4,23 +4,23 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 224 28% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 28% 12%;
-    --primary: 174 75% 26%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 32 35% 92%;
-    --secondary-foreground: 224 28% 18%;
-    --muted: 210 18% 94%;
-    --muted-foreground: 220 10% 38%;
-    --accent: 262 35% 45%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 48%;
+    --background: 232 63% 5%;
+    --foreground: 214 32% 91%;
+    --card: 222 47% 11%;
+    --card-foreground: 214 32% 91%;
+    --primary: 199 89% 60%;
+    --primary-foreground: 229 84% 5%;
+    --secondary: 222 47% 14%;
+    --secondary-foreground: 214 32% 91%;
+    --muted: 223 44% 13%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 263 90% 66%;
+    --accent-foreground: 214 32% 91%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 18% 84%;
-    --input: 214 18% 84%;
-    --ring: 174 75% 26%;
+    --border: 215 25% 27%;
+    --input: 215 25% 27%;
+    --ring: 188 86% 53%;
   }
 
   * {
@@ -29,8 +29,66 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(56, 189, 248, 0.2), transparent 26rem),
+      radial-gradient(circle at 82% 8%, rgba(139, 92, 246, 0.22), transparent 30rem),
+      radial-gradient(circle at 52% 88%, rgba(34, 211, 238, 0.12), transparent 28rem),
+      linear-gradient(135deg, #050816 0%, #080b1f 48%, #0b1026 100%);
+    background-attachment: fixed;
     font-feature-settings:
       'rlig' 1,
       'calt' 1;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px),
+      linear-gradient(135deg, transparent 0 42%, rgba(56, 189, 248, 0.055) 42% 43%, transparent 43% 100%),
+      linear-gradient(45deg, transparent 0 56%, rgba(139, 92, 246, 0.045) 56% 57%, transparent 57% 100%);
+    background-position:
+      0 0,
+      0 0,
+      0 0,
+      0 0;
+    background-size:
+      44px 44px,
+      44px 44px,
+      180px 180px,
+      220px 220px;
+    -webkit-mask-image: radial-gradient(circle at 50% 20%, black, transparent 78%);
+    mask-image: radial-gradient(circle at 50% 20%, black, transparent 78%);
+    opacity: 0.85;
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(56, 189, 248, 0.32);
+    color: #f8fafc;
+  }
+
+  select option {
+    background-color: #0f172a;
+    color: #e2e8f0;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #e2e8f0;
+    box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.92) inset;
+    transition: background-color 9999s ease-out;
   }
 }
