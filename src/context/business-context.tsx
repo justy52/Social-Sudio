@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { sanitizeUserFacingError, toUserFacingError } from '@/lib/user-facing-error';
 import type { Business, BusinessFormValues } from '@/types';
 
 interface BusinessContextValue {
@@ -51,13 +52,15 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         },
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | T
-        | null;
+      const payload = (await response.json().catch(() => null)) as { error?: string } | T | null;
 
       if (!response.ok) {
-        throw new Error((payload as { error?: string } | null)?.error ?? 'Request failed.');
+        throw new Error(
+          sanitizeUserFacingError(
+            (payload as { error?: string } | null)?.error,
+            `Request failed (${response.status}).`,
+          ),
+        );
       }
 
       return payload as T;
@@ -90,7 +93,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(activeBusinessStorageKey);
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Could not load businesses.');
+      setError(toUserFacingError(requestError, 'Could not load businesses.'));
     } finally {
       setIsLoading(false);
     }

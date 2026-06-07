@@ -57,6 +57,7 @@ import {
   parseHashtagsInput,
   validateClientImageFile,
 } from '@/lib/posts/ui';
+import { toUserFacingError } from '@/lib/user-facing-error';
 import { cn } from '@/lib/utils';
 
 type PostFormState = {
@@ -1138,7 +1139,7 @@ function buildScheduledAtIso(dateValue: string, timeValue: string) {
 }
 
 function readError(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  return toUserFacingError(error, fallback);
 }
 
 function applyCaptionSelection(

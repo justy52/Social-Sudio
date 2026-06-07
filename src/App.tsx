@@ -1,11 +1,9 @@
 import { RedirectToSignIn, useAuth } from '@clerk/clerk-react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/layout/app-shell';
-import { PrototypeNav } from '@/components/layout/prototype-nav';
 import { LoadingState } from '@/components/ui/loading';
 import { BusinessProvider } from '@/context/business-context';
 import { CalendarPage } from '@/pages/calendar';
-import { CaptionTestPage as CaptionStudioPage } from '@/pages/caption-test';
 import { DashboardPage } from '@/pages/dashboard';
 import { HomePage } from '@/pages/home';
 import { NotFoundPage } from '@/pages/not-found';
@@ -20,8 +18,8 @@ export function App() {
       <Route index element={<HomePage />} />
       <Route path="/sign-in/*" element={<SignInPage />} />
       <Route path="/sign-up/*" element={<SignUpPage />} />
-      <Route path="/studio" element={<ProtectedCaptionStudio />} />
-      <Route path="/caption-test" element={<ProtectedCaptionStudio />} />
+      <Route path="/studio" element={<Navigate to="/posts" replace />} />
+      <Route path="/caption-test" element={<Navigate to="/posts" replace />} />
       <Route element={<ProtectedApp />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/posts" element={<PostsPage />} />
@@ -30,25 +28,6 @@ export function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
-  );
-}
-
-function ProtectedCaptionStudio() {
-  const { isLoaded, isSignedIn } = useAuth();
-
-  if (!isLoaded) {
-    return <LoadingState label="Checking your session" />;
-  }
-
-  if (!isSignedIn) {
-    return <RedirectToSignIn />;
-  }
-
-  return (
-    <div className="min-h-screen bg-transparent">
-      <PrototypeNav />
-      <CaptionStudioPage />
-    </div>
   );
 }
 

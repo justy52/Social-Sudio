@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useBusinessContext } from '@/context/business-context';
+import { toUserFacingError } from '@/lib/user-facing-error';
 import type { BusinessFormValues } from '@/types';
 
 export function SettingsPage() {
@@ -50,7 +51,7 @@ export function SettingsPage() {
       await updateBusiness(activeBusiness.id, values);
       setStatus('Business settings saved.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not save settings.');
+      setStatus(toUserFacingError(error, 'Could not save settings.'));
     } finally {
       setIsSaving(false);
     }

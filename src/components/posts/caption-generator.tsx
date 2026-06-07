@@ -12,6 +12,7 @@ import {
   type GeneratedCaption,
 } from '@/lib/posts/client';
 import { buildCaptionSelection, type CaptionGeneratorSelection } from '@/lib/posts/captions-ui';
+import { toUserFacingError } from '@/lib/user-facing-error';
 import { cn } from '@/lib/utils';
 
 const toneOptions: { value: CaptionTone; label: string }[] = [
@@ -216,5 +217,5 @@ export function CaptionGenerator({ businessId, getToken, onUseCaption }: Caption
 }
 
 function readError(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  return toUserFacingError(error, fallback);
 }

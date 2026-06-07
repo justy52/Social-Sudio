@@ -21,6 +21,7 @@ import {
   type AuthTokenProvider,
   type PostMediaRecord,
 } from '@/lib/posts/client';
+import { toUserFacingError } from '@/lib/user-facing-error';
 
 type ImageEditorProps = {
   postId: string;
@@ -496,5 +497,5 @@ function canvasToPngBlob(canvas: HTMLCanvasElement) {
 }
 
 function readError(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  return toUserFacingError(error, fallback);
 }

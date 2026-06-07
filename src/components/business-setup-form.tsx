@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useBusinessContext } from '@/context/business-context';
+import { toUserFacingError } from '@/lib/user-facing-error';
 import type { BusinessFormValues } from '@/types';
 
 const industryOptions = [
@@ -48,9 +49,7 @@ export function BusinessSetupForm() {
     try {
       await createBusiness(values);
     } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : 'Could not create the business.',
-      );
+      setError(toUserFacingError(submitError, 'Could not create the business.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -65,8 +64,8 @@ export function BusinessSetupForm() {
           </div>
           <CardTitle>Set up your first business</CardTitle>
           <CardDescription>
-            Add the basic brand details Social Studio will use for future captions, draft
-            review, and manual exports.
+            Add the basic brand details Social Studio will use for future captions, draft review,
+            and manual exports.
           </CardDescription>
         </CardHeader>
         <CardContent>

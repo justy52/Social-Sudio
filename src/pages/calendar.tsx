@@ -41,6 +41,7 @@ import {
   prepareManualExport,
 } from '@/lib/posts/export';
 import type { PostStatus } from '@/lib/posts/status';
+import { toUserFacingError } from '@/lib/user-facing-error';
 import { cn } from '@/lib/utils';
 
 const filterLabels: Record<CalendarQueueFilter, string> = {
@@ -686,5 +687,5 @@ function formatDateTime(value: string, timeZone?: string) {
 }
 
 function readError(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  return toUserFacingError(error, fallback);
 }

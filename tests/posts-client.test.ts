@@ -211,7 +211,11 @@ test('export action falls back to original image when no edited image exists', (
     ...exportDetail,
     media: exportDetail.media
       .filter((media) => !media.isEdited)
-      .map((media) => ({ ...media, mimeType: 'image/jpeg', blobUrl: 'https://blob.example/original.jpg' })),
+      .map((media) => ({
+        ...media,
+        mimeType: 'image/jpeg',
+        blobUrl: 'https://blob.example/original.jpg',
+      })),
   });
 
   assert.equal(prepared.media.id, 'media_original');
@@ -354,7 +358,10 @@ test('edited image upload form data includes render metadata', () => {
   assert.equal(formData.get('width'), '1080');
   assert.equal(formData.get('height'), '566');
   assert.equal(formData.get('original_url'), 'https://blob.example/original.png');
-  assert.equal((formData.get('file') as File).name, 'edited-11111111-1111-4111-8111-111111111111.png');
+  assert.equal(
+    (formData.get('file') as File).name,
+    'edited-11111111-1111-4111-8111-111111111111.png',
+  );
   assert.equal(buildEditedImageFileName('post_1'), 'edited-post_1.png');
 });
 
@@ -373,7 +380,10 @@ test('uploadEditedPostImage posts edited PNG form data with auth', async () => {
     assert.equal(formData.get('width'), '1200');
     assert.equal(formData.get('height'), '630');
     assert.equal(formData.get('original_url'), 'https://blob.example/original.png');
-    assert.equal((formData.get('file') as File).name, 'edited-11111111-1111-4111-8111-111111111111.png');
+    assert.equal(
+      (formData.get('file') as File).name,
+      'edited-11111111-1111-4111-8111-111111111111.png',
+    );
 
     return new Response(
       JSON.stringify({
@@ -470,12 +480,7 @@ test('uploadPostImage surfaces platform payload limit errors clearly', async () 
 
   try {
     await assert.rejects(
-      () =>
-        uploadPostImage(
-          async () => 'test-token',
-          '11111111-1111-4111-8111-111111111111',
-          file,
-        ),
+      () => uploadPostImage(async () => 'test-token', '11111111-1111-4111-8111-111111111111', file),
       /4MB or smaller/,
     );
   } finally {
@@ -727,6 +732,37 @@ test('client request errors stay safe for export actions', async () => {
   }
 });
 
+test('client request errors hide raw serverless invocation failures', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: 'FUNCTION_INVOCATION_FAILED iad1::abc123' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  try {
+    await assert.rejects(
+      () =>
+        generateCaption(async () => 'test-token', {
+          business_id: '11111111-1111-4111-8111-111111111111',
+          prompt_context: 'New cedar fence installation in Heber City',
+          tone: 'professional',
+          include_hashtags: true,
+        }),
+      (error) => {
+        assert(error instanceof Error);
+        assert.equal(error.message, 'Request failed (500).');
+        assert.equal(error.message.includes('FUNCTION_INVOCATION_FAILED'), false);
+        assert.equal(error.message.includes('iad1::abc123'), false);
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('local API adapter includes media upload routes before the media key catchall', () => {
   assert.deepEqual(resolveLocalApiRoutePath('/api/media/upload'), {
     modulePath: '/api/media/upload.ts',
@@ -736,11 +772,14 @@ test('local API adapter includes media upload routes before the media key catcha
     modulePath: '/api/media/edited.ts',
     parseBody: false,
   });
-  assert.deepEqual(resolveLocalApiRoutePath('/api/media/businesses%2Fbiz%2Fposts%2Fpost%2Ffile.png'), {
-    modulePath: '/api/media/[key].ts',
-    params: { key: 'businesses/biz/posts/post/file.png' },
-    parseBody: false,
-  });
+  assert.deepEqual(
+    resolveLocalApiRoutePath('/api/media/businesses%2Fbiz%2Fposts%2Fpost%2Ffile.png'),
+    {
+      modulePath: '/api/media/[key].ts',
+      params: { key: 'businesses/biz/posts/post/file.png' },
+      parseBody: false,
+    },
+  );
 });
 
 test('status options expose only valid next transitions for the edit form', () => {
@@ -768,7 +807,8 @@ test('client upload validation rejects non-image files', () => {
 
 test('client upload validation rejects images over the Vercel request limit', () => {
   assert.throws(
-    () => validateClientImageFile({ name: 'large.jpg', size: 4 * 1024 * 1024 + 1, type: 'image/jpeg' }),
+    () =>
+      validateClientImageFile({ name: 'large.jpg', size: 4 * 1024 * 1024 + 1, type: 'image/jpeg' }),
     /4MB or smaller/,
   );
 });
@@ -1082,7 +1122,18 @@ test('dashboard summary keeps the 10 most recently updated posts', () => {
   assert.equal(summary.recentActivity.length, 10);
   assert.deepEqual(
     summary.recentActivity.map((post) => post.id),
-    ['post_11', 'post_10', 'post_9', 'post_8', 'post_7', 'post_6', 'post_5', 'post_4', 'post_3', 'post_2'],
+    [
+      'post_11',
+      'post_10',
+      'post_9',
+      'post_8',
+      'post_7',
+      'post_6',
+      'post_5',
+      'post_4',
+      'post_3',
+      'post_2',
+    ],
   );
 });
 

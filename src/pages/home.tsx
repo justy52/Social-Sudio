@@ -1,65 +1,82 @@
 import { Link } from 'react-router-dom';
-import { PrototypeNav } from '@/components/layout/prototype-nav';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const prototypeWorkflow = [
-  'Business Profile / Brand Memory',
-  'Draft Templates',
-  'Content Ideas',
-  'Caption Generation',
-  'Draft Review',
-  'Manual Export',
+const appNavigation = [
+  { name: 'Dashboard', href: '/dashboard', description: 'Track live content pipeline metrics.' },
+  {
+    name: 'Posts',
+    href: '/posts',
+    description: 'Create drafts, upload images, and generate AI captions.',
+  },
+  { name: 'Calendar', href: '/calendar', description: 'Manage scheduled manual posting queues.' },
+  {
+    name: 'Settings',
+    href: '/settings',
+    description: 'Update business profile and brand context.',
+  },
 ];
 
 export function HomePage() {
   return (
     <div className="min-h-screen bg-transparent text-foreground">
-      <PrototypeNav />
-
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
+        <header className="flex flex-col gap-4 border-b border-border/50 pb-6 sm:flex-row sm:items-center sm:justify-between">
+          <Link to="/" className="flex items-center gap-3 text-lg font-semibold tracking-normal">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/30 bg-primary/10 shadow-[0_0_24px_rgba(56,189,248,0.2)]">
+              <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_16px_rgba(56,189,248,0.85)]" />
+            </span>
+            <span>Social Studio</span>
+          </Link>
+
+          <nav className="flex flex-wrap gap-2" aria-label="Primary app navigation">
+            {appNavigation.map((item) => (
+              <Button key={item.href} asChild size="sm" variant="ghost">
+                <Link to={item.href}>{item.name}</Link>
+              </Button>
+            ))}
+          </nav>
+        </header>
+
         <section className="space-y-5">
-          <Badge>Local prototype</Badge>
+          <Badge>Phase 3 MVP</Badge>
           <div className="max-w-3xl space-y-3">
             <h1 className="text-4xl font-semibold tracking-normal">Social Studio</h1>
             <p className="text-base leading-7 text-muted-foreground">
-              AI-assisted content planning, caption drafting, review, and manual export for
-              small businesses.
+              AI-assisted content planning, database-backed post drafts, review, scheduling, and
+              manual export for small businesses.
             </p>
             <p className="text-sm leading-6 text-muted-foreground">
-              This prototype supports owner review and manual posting workflows. It does not
-              auto-post to social platforms.
+              Use Posts for the validated AI caption workflow. Social Studio does not auto-post to
+              social platforms in the Phase 3 MVP.
             </p>
           </div>
 
           <Button asChild>
-            <Link to="/studio">Open Caption Studio</Link>
+            <Link to="/posts">Open Posts</Link>
           </Button>
-          <p className="text-xs text-muted-foreground">
-            Opening Caption Studio uses the existing sign-in gate for this prototype.
-          </p>
         </section>
 
         <section className="space-y-3">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
-              Prototype workflow
+              App workflow
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Start with brand context, generate options, review drafts, and export approved
-              posts for manual publishing.
+              Start with live metrics, create or review posts, then schedule or export work for
+              manual publishing.
             </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {prototypeWorkflow.map((item, index) => (
-              <Card key={item}>
+            {appNavigation.map((item) => (
+              <Card key={item.href}>
                 <CardHeader>
-                  <CardTitle className="text-base">{item}</CardTitle>
+                  <CardTitle className="text-base">{item.name}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">Step {index + 1}</p>
+                  <p className="text-sm text-muted-foreground">{item.description}</p>
                 </CardContent>
               </Card>
             ))}

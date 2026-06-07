@@ -1,6 +1,7 @@
 import type { PostStatus } from './status.ts';
 import { buildEditedImageUploadFormData } from './image-editor.ts';
 import { validateClientImageFile } from './ui.ts';
+import { sanitizeUserFacingError } from '../user-facing-error.ts';
 
 export type AuthTokenProvider = () => Promise<string | null>;
 
@@ -157,10 +158,7 @@ export async function uploadEditedPostImage(
   return data.media;
 }
 
-export async function generateCaption(
-  getToken: AuthTokenProvider,
-  input: GenerateCaptionInput,
-) {
+export async function generateCaption(getToken: AuthTokenProvider, input: GenerateCaptionInput) {
   return authedRequest<GeneratedCaption>(getToken, '/api/captions/generate', {
     method: 'POST',
     body: JSON.stringify(input),
@@ -193,10 +191,10 @@ async function authedRequest<T>(
   const payload = parseResponsePayload<T>(responseText);
 
   if (!response.ok) {
-    throw new Error(
-      (payload as { error?: string } | null)?.error ??
-        buildRequestErrorMessage(response.status, responseText),
-    );
+    const fallback = buildRequestErrorMessage(response.status, responseText);
+    const message = (payload as { error?: string } | null)?.error ?? fallback;
+
+    throw new Error(sanitizeUserFacingError(message, fallback));
   }
 
   return payload as T;
