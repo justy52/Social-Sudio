@@ -76,6 +76,7 @@ export function buildUpdatePostValues(
     scheduledAt?: Date | null;
     exportedAt?: Date | null;
     manualPostedAt?: Date | null;
+    archivedAt?: Date | null;
     updatedAt: Date;
   } = {
     updatedAt: now,
@@ -86,6 +87,7 @@ export function buildUpdatePostValues(
   if (input.platformSize !== undefined) values.platformSize = input.platformSize;
   if (input.notes !== undefined) values.notes = input.notes;
   if (input.aiGenerated !== undefined) values.aiGenerated = input.aiGenerated;
+  if (input.archived !== undefined) values.archivedAt = input.archived ? now : null;
 
   if (input.manualPosted !== undefined) {
     if (!isPostStatus(currentStatusValue)) {

@@ -31,6 +31,7 @@ export type PostRecord = {
   scheduledAt: string | null;
   exportedAt: string | null;
   manualPostedAt: string | null;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -55,7 +56,10 @@ export type UpdatePostInput = {
   status?: PostStatus;
   scheduled_at?: string | null;
   manual_posted?: boolean;
+  archived?: boolean;
 };
+
+export type PostArchiveFilter = 'active' | 'archived' | 'all';
 
 export type CaptionTone = 'professional' | 'casual' | 'funny' | 'inspirational';
 
@@ -77,8 +81,12 @@ export function buildCreateDraftPayload(businessId: string) {
   return { business_id: businessId };
 }
 
-export async function listPosts(getToken: AuthTokenProvider, businessId: string) {
-  const searchParams = new URLSearchParams({ business_id: businessId });
+export async function listPosts(
+  getToken: AuthTokenProvider,
+  businessId: string,
+  archive: PostArchiveFilter = 'active',
+) {
+  const searchParams = new URLSearchParams({ business_id: businessId, archive });
   const data = await authedRequest<{ posts: PostSummary[] }>(
     getToken,
     `/api/posts?${searchParams.toString()}`,

@@ -19,36 +19,31 @@ export function buildDashboardSummary(
   timeZone?: string,
 ): DashboardSummary {
   const currentWeekKey = getWeekStartKey(now, timeZone);
+  const activePosts = posts.filter((post) => !post.archivedAt);
 
   return {
     metrics: {
-      draftsInProgress: posts.filter((post) => post.status === 'draft').length,
-      postsAwaitingReview: posts.filter((post) => post.status === 'ready_for_review').length,
-      approvedReadyToExport: posts.filter((post) => post.status === 'approved').length,
-      scheduledThisWeek: posts.filter((post) =>
+      draftsInProgress: activePosts.filter((post) => post.status === 'draft').length,
+      postsAwaitingReview: activePosts.filter((post) => post.status === 'ready_for_review').length,
+      approvedReadyToExport: activePosts.filter((post) => post.status === 'approved').length,
+      scheduledThisWeek: activePosts.filter((post) =>
         isScheduledInWeek(post, currentWeekKey, timeZone),
       ).length,
     },
-    recentActivity: [...posts]
+    recentActivity: [...activePosts]
       .sort((left, right) => compareDateDesc(left.updatedAt, right.updatedAt))
       .slice(0, 10),
-    upcomingScheduled: posts
+    upcomingScheduled: activePosts
       .filter((post) => {
         const scheduledAt = readDate(post.scheduledAt);
         return post.status === 'scheduled' && scheduledAt !== null && scheduledAt >= now;
       })
-      .sort((left, right) =>
-        compareDateAsc(left.scheduledAt ?? '', right.scheduledAt ?? ''),
-      )
+      .sort((left, right) => compareDateAsc(left.scheduledAt ?? '', right.scheduledAt ?? ''))
       .slice(0, 5),
   };
 }
 
-function isScheduledInWeek(
-  post: PostSummary,
-  currentWeekKey: string,
-  timeZone?: string,
-) {
+function isScheduledInWeek(post: PostSummary, currentWeekKey: string, timeZone?: string) {
   const scheduledAt = readDate(post.scheduledAt);
 
   return (

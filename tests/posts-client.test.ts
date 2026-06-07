@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createDraftPost,
+  deletePost,
   generateCaption,
   updatePost,
   uploadEditedPostImage,
@@ -165,6 +166,7 @@ const exportDetail: PostDetail = {
     scheduledAt: null,
     exportedAt: null,
     manualPostedAt: null,
+    archivedAt: null,
     createdAt: '2026-05-31T00:00:00.000Z',
     updatedAt: '2026-05-31T00:00:00.000Z',
   },
@@ -561,6 +563,7 @@ test('client payload sends scheduled_at correctly', async () => {
           scheduledAt: '2026-06-01T16:30:00.000Z',
           exportedAt: null,
           manualPostedAt: null,
+          archivedAt: null,
           createdAt: '2026-05-31T00:00:00.000Z',
           updatedAt: '2026-05-31T12:00:00.000Z',
         },
@@ -732,7 +735,7 @@ test('client request errors stay safe for export actions', async () => {
   }
 });
 
-test('client request errors hide raw serverless invocation failures', async () => {
+test('archive and delete client errors hide raw serverless invocation failures', async () => {
   const originalFetch = globalThis.fetch;
 
   globalThis.fetch = async () =>
@@ -744,12 +747,19 @@ test('client request errors hide raw serverless invocation failures', async () =
   try {
     await assert.rejects(
       () =>
-        generateCaption(async () => 'test-token', {
-          business_id: '11111111-1111-4111-8111-111111111111',
-          prompt_context: 'New cedar fence installation in Heber City',
-          tone: 'professional',
-          include_hashtags: true,
+        updatePost(async () => 'test-token', '11111111-1111-4111-8111-111111111111', {
+          archived: true,
         }),
+      (error) => {
+        assert(error instanceof Error);
+        assert.equal(error.message, 'Request failed (500).');
+        assert.equal(error.message.includes('FUNCTION_INVOCATION_FAILED'), false);
+        assert.equal(error.message.includes('iad1::abc123'), false);
+        return true;
+      },
+    );
+    await assert.rejects(
+      () => deletePost(async () => 'test-token', '11111111-1111-4111-8111-111111111111'),
       (error) => {
         assert(error instanceof Error);
         assert.equal(error.message, 'Request failed (500).');
@@ -869,6 +879,34 @@ test('calendar queue filters upcoming today past and exported posts', () => {
   assert.deepEqual(idsByFilter('past'), ['past']);
   assert.deepEqual(idsByFilter('upcoming'), ['today', 'upcoming']);
   assert.deepEqual(idsByFilter('exported'), ['exported']);
+});
+
+test('calendar queue excludes archived posts from active queue filters', () => {
+  const now = new Date('2026-05-31T12:00:00.000Z');
+  const archivedScheduled = buildQueuePost({
+    id: 'archived_scheduled',
+    status: 'scheduled',
+    scheduledAt: '2026-06-02T16:00:00.000Z',
+    archivedAt: '2026-05-31T12:00:00.000Z',
+  });
+  const archivedExported = buildQueuePost({
+    id: 'archived_exported',
+    status: 'exported',
+    scheduledAt: '2026-05-31T16:00:00.000Z',
+    exportedAt: '2026-05-31T17:00:00.000Z',
+    archivedAt: '2026-05-31T18:00:00.000Z',
+  });
+
+  assert.deepEqual(
+    filterCalendarQueuePosts([...queuePosts, archivedScheduled], 'upcoming', now).map(
+      (post) => post.id,
+    ),
+    ['today', 'upcoming'],
+  );
+  assert.deepEqual(
+    filterCalendarQueuePosts([archivedExported], 'exported', now).map((post) => post.id),
+    [],
+  );
 });
 
 test('today queue keeps manually posted scheduled items visible as complete', () => {
@@ -1091,6 +1129,38 @@ test('dashboard summary counts Phase 3 status metrics', () => {
   });
 });
 
+test('dashboard summary excludes archived posts from active metrics and lists', () => {
+  const now = new Date(2026, 5, 7, 12, 0, 0);
+  const activeDraft = buildQueuePost({
+    id: 'active_draft',
+    status: 'draft',
+    scheduledAt: null,
+    updatedAt: new Date(2026, 5, 7, 11, 0, 0).toISOString(),
+  });
+  const archivedDraft = buildQueuePost({
+    id: 'archived_draft',
+    status: 'draft',
+    scheduledAt: null,
+    archivedAt: new Date(2026, 5, 7, 10, 0, 0).toISOString(),
+    updatedAt: new Date(2026, 5, 7, 12, 0, 0).toISOString(),
+  });
+  const archivedScheduled = buildQueuePost({
+    id: 'archived_scheduled',
+    status: 'scheduled',
+    scheduledAt: new Date(2026, 5, 8, 12, 0, 0).toISOString(),
+    archivedAt: new Date(2026, 5, 7, 10, 0, 0).toISOString(),
+  });
+  const summary = buildDashboardSummary([activeDraft, archivedDraft, archivedScheduled], now);
+
+  assert.equal(summary.metrics.draftsInProgress, 1);
+  assert.equal(summary.metrics.scheduledThisWeek, 0);
+  assert.deepEqual(
+    summary.recentActivity.map((post) => post.id),
+    ['active_draft'],
+  );
+  assert.deepEqual(summary.upcomingScheduled, []);
+});
+
 test('dashboard summary counts scheduled week in the business timezone', () => {
   const now = new Date('2026-06-07T05:30:00.000Z');
   const scheduledInNextDenverWeek = new Date('2026-06-07T06:30:00.000Z');
@@ -1184,6 +1254,7 @@ function buildQueuePost(overrides: Partial<PostSummary> = {}): PostSummary {
     scheduledAt: '2026-05-31T16:00:00.000Z',
     exportedAt: null,
     manualPostedAt: null,
+    archivedAt: null,
     createdAt: '2026-05-31T00:00:00.000Z',
     updatedAt: '2026-05-31T12:00:00.000Z',
     mediaCount: 1,

@@ -60,6 +60,7 @@ export const posts = pgTable(
     scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     exportedAt: timestamp('exported_at', { withTimezone: true }),
     manualPostedAt: timestamp('manual_posted_at', { withTimezone: true }),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -67,10 +68,17 @@ export const posts = pgTable(
     businessIdx: index('idx_posts_business').on(table.businessId),
     statusIdx: index('idx_posts_status').on(table.status),
     businessStatusIdx: index('idx_posts_business_status').on(table.businessId, table.status),
-    businessScheduledIdx: index('idx_posts_business_scheduled').on(table.businessId, table.scheduledAt),
+    businessScheduledIdx: index('idx_posts_business_scheduled').on(
+      table.businessId,
+      table.scheduledAt,
+    ),
     businessManualPostedIdx: index('idx_posts_business_manual_posted').on(
       table.businessId,
       table.manualPostedAt,
+    ),
+    businessArchivedIdx: index('idx_posts_business_archived').on(
+      table.businessId,
+      table.archivedAt,
     ),
   }),
 );

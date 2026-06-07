@@ -28,7 +28,10 @@ export const businessUpdateSchema = businessCreateSchema.partial().extend({
 const postTextField = z.string().trim().max(2200);
 const postNotesField = z.string().trim().max(1200);
 const postHashtagsField = z.array(z.string().trim().min(1).max(80)).max(30);
-const platformSizeField = z.string().trim().regex(/^\d{3,4}x\d{3,4}$/, 'Use WIDTHxHEIGHT format.');
+const platformSizeField = z
+  .string()
+  .trim()
+  .regex(/^\d{3,4}x\d{3,4}$/, 'Use WIDTHxHEIGHT format.');
 const isoDateStringField = z.string().datetime({ offset: true });
 
 export const postCreateSchema = z
@@ -53,10 +56,12 @@ export const postCreateSchema = z
 export const postListQuerySchema = z
   .object({
     business_id: z.string().uuid().optional(),
+    archive: z.enum(['active', 'archived', 'all']).optional(),
   })
   .passthrough()
   .transform((input) => ({
     businessId: input.business_id,
+    archive: input.archive ?? 'active',
   }));
 
 export const postIdSchema = z.string().uuid();
@@ -86,6 +91,7 @@ export const postUpdateSchema = z
     status: z.enum(postStatuses).optional(),
     scheduled_at: isoDateStringField.nullable().optional(),
     manual_posted: z.boolean().optional(),
+    archived: z.boolean().optional(),
   })
   .strict()
   .refine((input) => Object.values(input).some((value) => value !== undefined), {
@@ -101,6 +107,7 @@ export const postUpdateSchema = z
       status?: (typeof postStatuses)[number];
       scheduledAt?: Date | null;
       manualPosted?: boolean;
+      archived?: boolean;
     } = {};
 
     if (input.caption !== undefined) output.caption = input.caption;
@@ -113,6 +120,7 @@ export const postUpdateSchema = z
       output.scheduledAt = input.scheduled_at === null ? null : new Date(input.scheduled_at);
     }
     if (input.manual_posted !== undefined) output.manualPosted = input.manual_posted;
+    if (input.archived !== undefined) output.archived = input.archived;
 
     return output;
   });

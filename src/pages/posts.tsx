@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Archive,
   Bot,
   CalendarClock,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -31,6 +33,7 @@ import {
   deletePostImage,
   getPost,
   listPosts,
+  type PostArchiveFilter,
   type PostDetail,
   type PostMediaRecord,
   type PostSummary,
@@ -96,12 +99,19 @@ const emptyForm: PostFormState = {
   aiGenerated: false,
 };
 
+const archiveFilters: { value: PostArchiveFilter; label: string }[] = [
+  { value: 'active', label: 'Active' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'all', label: 'All' },
+];
+
 export function PostsPage() {
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
   const { activeBusiness } = useBusinessContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [archiveFilter, setArchiveFilter] = useState<PostArchiveFilter>('active');
   const [form, setForm] = useState<PostFormState>(emptyForm);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
@@ -110,6 +120,7 @@ export function PostsPage() {
 
   useEffect(() => {
     setSelectedPostId(null);
+    setArchiveFilter('active');
     setMessage(null);
     setError(null);
   }, [activeBusiness?.id]);
@@ -123,8 +134,8 @@ export function PostsPage() {
   }, [searchParams]);
 
   const postsQuery = useQuery({
-    queryKey: ['posts', activeBusiness?.id],
-    queryFn: () => listPosts(getToken, activeBusiness?.id ?? ''),
+    queryKey: ['posts', activeBusiness?.id, archiveFilter],
+    queryFn: () => listPosts(getToken, activeBusiness?.id ?? '', archiveFilter),
     enabled: Boolean(activeBusiness?.id),
   });
 
@@ -260,12 +271,59 @@ export function PostsPage() {
     },
     onSuccess: async () => {
       setSelectedPostId(null);
-      setMessage('Draft deleted.');
+      setSearchParams({});
+      setMessage('Post permanently deleted.');
       setError(null);
       await queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] });
     },
     onError: (mutationError) => {
       setError(readError(mutationError, 'Could not delete post.'));
+      setMessage(null);
+    },
+  });
+
+  const archivePostMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPostId) {
+        throw new Error('Select a post before archiving.');
+      }
+
+      return updatePost(getToken, selectedPostId, { archived: true });
+    },
+    onSuccess: async () => {
+      setSelectedPostId(null);
+      setSearchParams({});
+      setMessage('Post archived.');
+      setError(null);
+      await queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] });
+    },
+    onError: (mutationError) => {
+      setError(readError(mutationError, 'Could not archive post.'));
+      setMessage(null);
+    },
+  });
+
+  const restorePostMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPostId) {
+        throw new Error('Select a post before restoring.');
+      }
+
+      return updatePost(getToken, selectedPostId, { archived: false });
+    },
+    onSuccess: async (post) => {
+      setArchiveFilter('active');
+      setSelectedPostId(post.id);
+      setSearchParams({ post_id: post.id });
+      setMessage('Post restored.');
+      setError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['posts', activeBusiness?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['post', post.id] }),
+      ]);
+    },
+    onError: (mutationError) => {
+      setError(readError(mutationError, 'Could not restore post.'));
       setMessage(null);
     },
   });
@@ -461,16 +519,36 @@ export function PostsPage() {
                 Draft workspace
               </h2>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => void postsQuery.refetch()}
-              disabled={postsQuery.isFetching}
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              Refresh
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex rounded-md border border-border/60 bg-secondary/35 p-1">
+                {archiveFilters.map((filter) => (
+                  <Button
+                    key={filter.value}
+                    type="button"
+                    variant={archiveFilter === filter.value ? 'default' : 'ghost'}
+                    size="sm"
+                    aria-pressed={archiveFilter === filter.value}
+                    onClick={() => {
+                      setArchiveFilter(filter.value);
+                      setSelectedPostId(null);
+                      setSearchParams({});
+                    }}
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void postsQuery.refetch()}
+                disabled={postsQuery.isFetching}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Refresh
+              </Button>
+            </div>
           </div>
 
           {postsQuery.isLoading ? (
@@ -487,10 +565,18 @@ export function PostsPage() {
           ) : posts.length === 0 ? (
             <Card className="border-dashed border-primary/25 bg-card/55">
               <CardHeader>
-                <ImagePlus className="h-5 w-5 text-primary" aria-hidden="true" />
-                <CardTitle>No posts yet</CardTitle>
+                {archiveFilter === 'archived' ? (
+                  <Archive className="h-5 w-5 text-primary" aria-hidden="true" />
+                ) : (
+                  <ImagePlus className="h-5 w-5 text-primary" aria-hidden="true" />
+                )}
+                <CardTitle>
+                  {archiveFilter === 'archived' ? 'No archived posts' : 'No posts yet'}
+                </CardTitle>
                 <CardDescription>
-                  Create a draft to start testing the image workflow.
+                  {archiveFilter === 'archived'
+                    ? 'Archived posts will appear here when you clean up active work.'
+                    : 'Create a draft to start testing the image workflow.'}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -520,6 +606,8 @@ export function PostsPage() {
           isSaving={updateMutation.isPending}
           isUploading={uploadMutation.isPending}
           isDeletingPost={deletePostMutation.isPending}
+          isArchivingPost={archivePostMutation.isPending}
+          isRestoringPost={restorePostMutation.isPending}
           isDeletingMedia={deleteMediaMutation.isPending}
           isExporting={exportMutation.isPending}
           isScheduling={scheduleMutation.isPending}
@@ -534,6 +622,16 @@ export function PostsPage() {
           onExport={() => exportMutation.mutate()}
           onSchedule={() => scheduleMutation.mutate()}
           onUnschedule={() => unscheduleMutation.mutate()}
+          onArchivePost={() => {
+            if (
+              window.confirm(
+                'Archive this post? It will be hidden from active Posts, Dashboard, and Calendar views.',
+              )
+            ) {
+              archivePostMutation.mutate();
+            }
+          }}
+          onRestorePost={() => restorePostMutation.mutate()}
           onCopyText={async (label, text) => {
             try {
               await copyTextToClipboard(text);
@@ -551,7 +649,7 @@ export function PostsPage() {
             }
           }}
           onDeletePost={() => {
-            if (window.confirm('Delete this draft post?')) {
+            if (window.confirm('Permanently delete this post? This cannot be undone.')) {
               deletePostMutation.mutate();
             }
           }}
@@ -601,12 +699,22 @@ function PostListCard({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <Badge className={statusStyles[post.status]}>{statusLabels[post.status]}</Badge>
+          {post.archivedAt && (
+            <Badge className="border-muted-foreground/30 bg-muted/20 text-muted-foreground">
+              Archived
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground">{post.platformSize}</span>
         </div>
         <p className="mt-2 line-clamp-2 text-sm font-medium">{post.caption || 'Untitled draft'}</p>
         <p className="mt-2 text-xs text-muted-foreground">
           Updated {formatDate(post.updatedAt)} / Created {formatDate(post.createdAt)}
         </p>
+        {post.archivedAt && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Archived {formatDate(post.archivedAt)}
+          </p>
+        )}
       </div>
     </button>
   );
@@ -623,6 +731,8 @@ function PostEditor({
   isSaving,
   isUploading,
   isDeletingPost,
+  isArchivingPost,
+  isRestoringPost,
   isDeletingMedia,
   isExporting,
   isScheduling,
@@ -637,6 +747,8 @@ function PostEditor({
   onExport,
   onSchedule,
   onUnschedule,
+  onArchivePost,
+  onRestorePost,
   onCopyText,
   onUpload,
   onDeleteMedia,
@@ -653,6 +765,8 @@ function PostEditor({
   isSaving: boolean;
   isUploading: boolean;
   isDeletingPost: boolean;
+  isArchivingPost: boolean;
+  isRestoringPost: boolean;
   isDeletingMedia: boolean;
   isExporting: boolean;
   isScheduling: boolean;
@@ -667,6 +781,8 @@ function PostEditor({
   onExport: () => void;
   onSchedule: () => void;
   onUnschedule: () => void;
+  onArchivePost: () => void;
+  onRestorePost: () => void;
   onCopyText: (label: string, text: string) => Promise<void> | void;
   onUpload: (files: File[]) => void;
   onDeleteMedia: (media: PostMediaRecord) => void;
@@ -711,6 +827,7 @@ function PostEditor({
   });
   const isExportable = canExportPost(detail.post.status);
   const isQuickExport = detail.post.status === 'draft' || detail.post.status === 'ready_for_review';
+  const isArchived = Boolean(detail.post.archivedAt);
   const statusSelectOptions = statusOptions.filter(
     (status) => status !== 'scheduled' || detail.post.status === 'scheduled',
   );
@@ -725,13 +842,38 @@ function PostEditor({
               <Pencil className="h-4 w-4 text-primary" aria-hidden="true" />
             </span>
             <div>
-              <CardTitle>Edit draft</CardTitle>
+              <CardTitle>{isArchived ? 'Archived post' : 'Edit post'}</CardTitle>
               <CardDescription>
-                Save copy, upload images, and move through the lean Phase 2 review states.
+                {isArchived
+                  ? 'Restore this post to bring it back into active workspace views.'
+                  : 'Save copy, upload images, and move through the lean Phase 3 review states.'}
               </CardDescription>
             </div>
           </div>
-          {detail.post.status === 'draft' && (
+          <div className="relative flex flex-wrap gap-2">
+            {isArchived ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRestorePost}
+                disabled={isRestoringPost}
+              >
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                {isRestoringPost ? 'Restoring' : 'Restore'}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onArchivePost}
+                disabled={isArchivingPost}
+              >
+                <Archive className="h-4 w-4" aria-hidden="true" />
+                {isArchivingPost ? 'Archiving' : 'Archive'}
+              </Button>
+            )}
             <Button
               type="button"
               variant="destructive"
@@ -740,9 +882,9 @@ function PostEditor({
               disabled={isDeletingPost}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
-              Delete
+              {isDeletingPost ? 'Deleting' : 'Delete permanently'}
             </Button>
-          )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5 p-5">

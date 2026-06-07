@@ -1,11 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
-import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from '../../src/lib/api-helpers.ts';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
+import {
+  handleApiError,
+  methodNotAllowed,
+  parseJsonBody,
+  sendJson,
+} from '../../src/lib/api-helpers.ts';
 import { requireAuth, requireBusinessOwnership } from '../../src/lib/auth.ts';
 import { db } from '../../src/lib/db/index.ts';
 import { businesses, postMedia, posts } from '../../src/lib/db/schema.ts';
 import { buildCreatePostValues, mapOwnedPostRows } from '../../src/lib/posts/api.ts';
 import { postCreateSchema, postListQuerySchema } from '../../src/lib/validation.ts';
+
+type ArchiveFilter = 'active' | 'archived' | 'all';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -32,7 +39,12 @@ async function listPosts(req: VercelRequest, res: VercelResponse) {
       .select({ post: posts, business: businesses })
       .from(posts)
       .innerJoin(businesses, eq(posts.businessId, businesses.id))
-      .where(and(eq(businesses.userId, userId), eq(posts.businessId, query.businessId)))
+      .where(
+        buildPostListWhere(
+          [eq(businesses.userId, userId), eq(posts.businessId, query.businessId)],
+          query.archive,
+        ),
+      )
       .orderBy(desc(posts.updatedAt));
 
     return sendJson(res, 200, { posts: await addMediaSummaries(mapOwnedPostRows(rows, userId)) });
@@ -43,7 +55,7 @@ async function listPosts(req: VercelRequest, res: VercelResponse) {
     .select({ post: posts, business: businesses })
     .from(posts)
     .innerJoin(businesses, eq(posts.businessId, businesses.id))
-    .where(eq(businesses.userId, userId))
+    .where(buildPostListWhere([eq(businesses.userId, userId)], query.archive))
     .orderBy(desc(posts.updatedAt));
 
   return sendJson(res, 200, { posts: await addMediaSummaries(mapOwnedPostRows(rows, userId)) });
@@ -90,4 +102,22 @@ async function addMediaSummaries(postRows: (typeof posts.$inferSelect)[]) {
       finalMedia: media.find((item) => item.isEdited) ?? media[0] ?? null,
     };
   });
+}
+
+function buildPostListWhere(baseConditions: SQL[], archive: ArchiveFilter) {
+  const archiveCondition = getArchiveCondition(archive);
+
+  return and(...(archiveCondition ? [...baseConditions, archiveCondition] : baseConditions));
+}
+
+function getArchiveCondition(archive: ArchiveFilter) {
+  if (archive === 'archived') {
+    return isNotNull(posts.archivedAt);
+  }
+
+  if (archive === 'active') {
+    return isNull(posts.archivedAt);
+  }
+
+  return null;
 }

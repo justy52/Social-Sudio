@@ -28,6 +28,7 @@ export function filterCalendarQueuePosts(
   now = new Date(),
 ) {
   return posts
+    .filter((post) => !post.archivedAt)
     .filter((post): post is CalendarQueuePost => {
       if (filter === 'exported') {
         return post.status === 'exported';
@@ -92,10 +93,7 @@ export function getTodayQueueEmptyState(remainingCount: number, postedCount: num
   return 'none' as const;
 }
 
-export function groupCalendarQueuePosts(
-  posts: CalendarQueuePost[],
-  timeZone?: string,
-) {
+export function groupCalendarQueuePosts(posts: CalendarQueuePost[], timeZone?: string) {
   const groups = new Map<string, CalendarQueuePost[]>();
 
   for (const post of posts) {

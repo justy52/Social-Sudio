@@ -9,7 +9,7 @@ import {
   buildUpdatePostValues,
   mapOwnedPostRows,
 } from '../src/lib/posts/api.ts';
-import { postCreateSchema, postUpdateSchema } from '../src/lib/validation.ts';
+import { postCreateSchema, postListQuerySchema, postUpdateSchema } from '../src/lib/validation.ts';
 
 test('manual posted migration adds nullable timestamp and business index', () => {
   const migration = readFileSync(
@@ -19,6 +19,16 @@ test('manual posted migration adds nullable timestamp and business index', () =>
 
   assert.match(migration, /ADD COLUMN "manual_posted_at" timestamp with time zone/);
   assert.match(migration, /idx_posts_business_manual_posted/);
+});
+
+test('archive migration adds nullable timestamp and business index', () => {
+  const migration = readFileSync(
+    new URL('../src/lib/db/migrations/0004_phase_3_8_post_archive.sql', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(migration, /ADD COLUMN "archived_at" timestamp with time zone/);
+  assert.match(migration, /idx_posts_business_archived/);
 });
 
 test('create post requires an owned business', () => {
@@ -64,9 +74,22 @@ test('list posts returns only authenticated user rows', () => {
   assert.deepEqual(mapOwnedPostRows(rows, 'user_1'), [{ id: 'post_1' }]);
 });
 
+test('list posts query defaults to active and accepts archive filters', () => {
+  assert.deepEqual(postListQuerySchema.parse({}), {
+    businessId: undefined,
+    archive: 'active',
+  });
+  assert.equal(postListQuerySchema.parse({ archive: 'archived' }).archive, 'archived');
+  assert.equal(postListQuerySchema.parse({ archive: 'all' }).archive, 'all');
+  assert.throws(() => postListQuerySchema.parse({ archive: 'deleted' }));
+});
+
 test('get update and delete require post ownership', () => {
   assert.doesNotThrow(() =>
-    assertOwnedPostForPosts({ post: { status: 'draft' }, business: { userId: 'user_1' } }, 'user_1'),
+    assertOwnedPostForPosts(
+      { post: { status: 'draft' }, business: { userId: 'user_1' } },
+      'user_1',
+    ),
   );
   assert.throws(
     () =>
@@ -128,6 +151,25 @@ test('approved post can be scheduled with a future scheduled_at', () => {
   assert.equal(values.exportedAt, undefined);
 });
 
+test('archive and restore values are server timestamp controlled', () => {
+  const now = new Date('2026-06-07T12:00:00.000Z');
+  const archiveInput = postUpdateSchema.parse({ archived: true });
+  const archiveValues = buildUpdatePostValues('draft', archiveInput, now);
+
+  assert.equal(archiveValues.archivedAt, now);
+  assert.equal(archiveValues.updatedAt, now);
+
+  const restoreInput = postUpdateSchema.parse({ archived: false });
+  const restoreValues = buildUpdatePostValues('exported', restoreInput, now);
+
+  assert.equal(restoreValues.archivedAt, null);
+  assert.throws(() =>
+    postUpdateSchema.parse({
+      archived_at: now.toISOString(),
+    }),
+  );
+});
+
 test('approved to scheduled requires scheduled_at in the future', () => {
   const now = new Date('2026-05-28T00:00:00.000Z');
 
@@ -172,23 +214,18 @@ test('draft to scheduled is rejected', () => {
 
 test('scheduled to approved clears scheduled_at', () => {
   const input = postUpdateSchema.parse({ status: 'approved' });
-  const values = buildUpdatePostValues(
-    'scheduled',
-    input,
-    new Date('2026-05-28T00:00:00.000Z'),
-  );
+  const values = buildUpdatePostValues('scheduled', input, new Date('2026-05-28T00:00:00.000Z'));
 
   assert.equal(values.status, 'approved');
   assert.equal(values.scheduledAt, null);
 });
 
 test('scheduled post can be saved without rescheduling', () => {
-  const input = postUpdateSchema.parse({ caption: 'Updated scheduled caption', status: 'scheduled' });
-  const values = buildUpdatePostValues(
-    'scheduled',
-    input,
-    new Date('2026-05-28T00:00:00.000Z'),
-  );
+  const input = postUpdateSchema.parse({
+    caption: 'Updated scheduled caption',
+    status: 'scheduled',
+  });
+  const values = buildUpdatePostValues('scheduled', input, new Date('2026-05-28T00:00:00.000Z'));
 
   assert.equal(values.caption, 'Updated scheduled caption');
   assert.equal(values.status, undefined);
@@ -218,12 +255,9 @@ test('scheduled manual posted action ends exported and sets server timestamps', 
 test('undo manual posted restores scheduled posts and clears completion timestamps', () => {
   const scheduledAt = new Date('2026-05-31T16:00:00.000Z');
   const input = postUpdateSchema.parse({ manual_posted: false });
-  const values = buildUpdatePostValues(
-    'exported',
-    input,
-    new Date('2026-05-28T00:00:00.000Z'),
-    { scheduledAt },
-  );
+  const values = buildUpdatePostValues('exported', input, new Date('2026-05-28T00:00:00.000Z'), {
+    scheduledAt,
+  });
 
   assert.equal(values.status, 'scheduled');
   assert.equal(values.exportedAt, null);
@@ -251,12 +285,9 @@ test('draft review and approved posts cannot be marked manually posted', () => {
 
 test('undo manual posted on unscheduled exported post leaves exported status unchanged', () => {
   const input = postUpdateSchema.parse({ manual_posted: false });
-  const values = buildUpdatePostValues(
-    'exported',
-    input,
-    new Date('2026-05-28T00:00:00.000Z'),
-    { scheduledAt: null },
-  );
+  const values = buildUpdatePostValues('exported', input, new Date('2026-05-28T00:00:00.000Z'), {
+    scheduledAt: null,
+  });
 
   assert.equal(values.status, undefined);
   assert.equal(values.exportedAt, undefined);
