@@ -34,9 +34,11 @@ const authAppearance = {
     headerTitle: 'text-foreground',
     headerSubtitle: 'text-muted-foreground',
     socialButtonsBlockButton:
-      'border-border/70 bg-secondary/70 text-foreground hover:bg-primary/10',
-    formFieldInput: 'border-input/80 bg-secondary/70 text-foreground focus:border-primary',
-    formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+      'border-border/70 bg-secondary/70 text-foreground transition-colors hover:bg-primary/10',
+    formFieldInput:
+      'border-input/80 bg-secondary/70 text-foreground focus:border-primary focus:ring-2 focus:ring-cyan-400/40',
+    formButtonPrimary:
+      'bg-primary text-primary-foreground shadow-[0_0_28px_rgba(56,189,248,0.24)] transition-colors hover:bg-primary/90',
     footerActionLink: 'text-primary hover:text-cyan-200',
   },
 };

@@ -128,6 +128,8 @@ export function DashboardPage() {
 
       {(message || error) && (
         <div
+          role={error ? 'alert' : 'status'}
+          aria-live="polite"
           className={cn(
             'rounded-md border px-4 py-3 text-sm shadow-[0_0_28px_rgba(56,189,248,0.08)] backdrop-blur-xl',
             error
@@ -155,7 +157,14 @@ export function DashboardPage() {
                   <CardContent className="relative flex items-start justify-between gap-3 p-4">
                     <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-60" />
                     <div>
-                      <p className="text-2xl font-semibold">{isLoading ? '-' : item.value}</p>
+                      <p
+                        className={cn(
+                          'text-2xl font-semibold',
+                          isLoading && 'text-primary/70 motion-safe:animate-pulse',
+                        )}
+                      >
+                        {isLoading ? '-' : item.value}
+                      </p>
                       <p className="mt-1 text-sm text-muted-foreground">{item.label}</p>
                     </div>
                     <div className="rounded-md border border-primary/25 bg-primary/10 p-2 text-primary shadow-[0_0_24px_rgba(56,189,248,0.16)] transition-all duration-200 group-hover:border-primary/45 group-hover:bg-primary/15">
@@ -300,7 +309,7 @@ function ActivityRow({
     <Link
       to={`/posts?post_id=${post.id}`}
       className={cn(
-        'group grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 p-3 text-card-foreground transition-all duration-200 hover:bg-primary/10 hover:shadow-[inset_3px_0_0_rgba(56,189,248,0.55)]',
+        'group grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 p-3 text-card-foreground transition-all duration-200 hover:bg-primary/10 hover:shadow-[inset_3px_0_0_rgba(56,189,248,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset motion-reduce:transition-none',
         className,
       )}
     >
@@ -392,12 +401,16 @@ function Thumbnail({ url, size }: { url: string | null; size: 'sm' | 'md' }) {
 
 function LoadingPanel({ title, description }: { title: string; description: string }) {
   return (
-    <Card className="border-primary/15 bg-card/65">
+    <Card className="overflow-hidden border-primary/15 bg-card/65" aria-busy="true">
       <CardHeader>
         <Activity className="h-5 w-5 text-primary" aria-hidden="true" />
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="h-2 rounded-full bg-primary/15 motion-safe:animate-pulse" />
+        <div className="h-2 w-2/3 rounded-full bg-violet-300/15 motion-safe:animate-pulse" />
+      </CardContent>
     </Card>
   );
 }

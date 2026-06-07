@@ -35,6 +35,8 @@ export function SettingsPage() {
     return null;
   }
 
+  const isStatusError = Boolean(status && status !== 'Business settings saved.');
+
   const updateValue = (field: keyof BusinessFormValues, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
   };
@@ -159,7 +161,15 @@ export function SettingsPage() {
             </div>
 
             {status ? (
-              <p className="rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-primary">
+              <p
+                role={isStatusError ? 'alert' : 'status'}
+                aria-live="polite"
+                className={
+                  isStatusError
+                    ? 'rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive'
+                    : 'rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-primary'
+                }
+              >
                 {status}
               </p>
             ) : null}

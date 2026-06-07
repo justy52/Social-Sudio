@@ -73,9 +73,12 @@ export function CaptionGenerator({ businessId, getToken, onUseCaption }: Caption
   }
 
   return (
-    <section className="relative space-y-4 overflow-hidden rounded-md border border-violet-300/20 bg-card/55 p-4 shadow-[0_18px_48px_rgba(2,6,23,0.28),0_0_30px_rgba(139,92,246,0.08)] backdrop-blur-xl">
+    <section
+      className="relative space-y-4 overflow-hidden rounded-md border border-violet-300/20 bg-card/55 p-4 shadow-[0_18px_48px_rgba(2,6,23,0.28),0_0_30px_rgba(139,92,246,0.08)] backdrop-blur-xl"
+      aria-busy={isGenerating}
+    >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/60 to-transparent" />
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-md border border-violet-300/25 bg-violet-400/10 shadow-[0_0_22px_rgba(139,92,246,0.14)]">
             <Sparkles className="h-4 w-4 text-violet-200" aria-hidden="true" />
@@ -136,7 +139,10 @@ export function CaptionGenerator({ businessId, getToken, onUseCaption }: Caption
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-[0_0_24px_rgba(239,68,68,0.08)]">
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-[0_0_24px_rgba(239,68,68,0.08)]"
+        >
           {error}
         </div>
       )}
@@ -145,6 +151,13 @@ export function CaptionGenerator({ businessId, getToken, onUseCaption }: Caption
         <Sparkles className="h-4 w-4" aria-hidden="true" />
         {isGenerating ? 'Generating' : generated ? 'Regenerate' : 'Generate'}
       </Button>
+
+      {isGenerating && (
+        <div className="space-y-2" aria-hidden="true">
+          <div className="h-2 rounded-full bg-violet-300/15 motion-safe:animate-pulse" />
+          <div className="h-2 w-2/3 rounded-full bg-primary/15 motion-safe:animate-pulse" />
+        </div>
+      )}
 
       {generated && (
         <div className="space-y-4 rounded-md border border-border/60 bg-secondary/35 p-4">
@@ -167,7 +180,7 @@ export function CaptionGenerator({ businessId, getToken, onUseCaption }: Caption
                     type="button"
                     onClick={() => setSelectedCaption(alternative)}
                     className={cn(
-                      'rounded-md border bg-card/55 p-3 text-left text-sm text-card-foreground shadow-[0_10px_28px_rgba(2,6,23,0.18)] transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                      'rounded-md border bg-card/55 p-3 text-left text-sm text-card-foreground shadow-[0_10px_28px_rgba(2,6,23,0.18)] transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none',
                       selectedCaption === alternative
                         ? 'border-primary/70 bg-primary/15 shadow-[0_0_28px_rgba(56,189,248,0.12)]'
                         : 'border-border/70',

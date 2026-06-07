@@ -198,6 +198,8 @@ export function CalendarPage() {
 
       {(message || error) && (
         <div
+          role={error ? 'alert' : 'status'}
+          aria-live="polite"
           className={cn(
             'rounded-md border px-4 py-3 text-sm shadow-[0_0_28px_rgba(56,189,248,0.08)] backdrop-blur-xl',
             error
@@ -217,6 +219,7 @@ export function CalendarPage() {
             variant={activeFilter === filter ? 'default' : 'outline'}
             size="sm"
             onClick={() => setActiveFilter(filter)}
+            aria-pressed={activeFilter === filter}
           >
             {filterLabels[filter]}
           </Button>
@@ -224,11 +227,15 @@ export function CalendarPage() {
       </div>
 
       {postsQuery.isLoading ? (
-        <Card className="border-primary/15 bg-card/65">
+        <Card className="overflow-hidden border-primary/15 bg-card/65" aria-busy="true">
           <CardHeader>
             <CardTitle>Loading queue</CardTitle>
             <CardDescription>Fetching scheduled posts for the selected business.</CardDescription>
           </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="h-2 rounded-full bg-primary/15 motion-safe:animate-pulse" />
+            <div className="h-2 w-3/4 rounded-full bg-violet-300/15 motion-safe:animate-pulse" />
+          </CardContent>
         </Card>
       ) : activeFilter === 'today' ? (
         <TodayQueueView
@@ -444,7 +451,7 @@ function TodayEmptyState({ kind }: { kind: 'no-posts' | 'all-posted' }) {
     >
       <CardHeader>
         {isComplete ? (
-          <CheckCircle2 className="h-5 w-5 text-primary" aria-hidden="true" />
+          <CheckCircle2 className="h-5 w-5 text-emerald-200" aria-hidden="true" />
         ) : (
           <CalendarDays className="h-5 w-5 text-primary" aria-hidden="true" />
         )}

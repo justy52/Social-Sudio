@@ -436,6 +436,8 @@ export function PostsPage() {
 
       {(message || error) && (
         <div
+          role={error ? 'alert' : 'status'}
+          aria-live="polite"
           className={cn(
             'rounded-md border px-4 py-3 text-sm shadow-[0_0_28px_rgba(56,189,248,0.08)] backdrop-blur-xl',
             error
@@ -471,11 +473,15 @@ export function PostsPage() {
           </div>
 
           {postsQuery.isLoading ? (
-            <Card className="border-primary/15 bg-card/65">
+            <Card className="overflow-hidden border-primary/15 bg-card/65" aria-busy="true">
               <CardHeader>
                 <CardTitle>Loading posts</CardTitle>
                 <CardDescription>Fetching drafts for the selected business.</CardDescription>
               </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="h-2 rounded-full bg-primary/15 motion-safe:animate-pulse" />
+                <div className="h-2 w-2/3 rounded-full bg-violet-300/15 motion-safe:animate-pulse" />
+              </CardContent>
             </Card>
           ) : posts.length === 0 ? (
             <Card className="border-dashed border-primary/25 bg-card/55">
@@ -578,7 +584,7 @@ function PostListCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'group grid w-full grid-cols-[72px_minmax(0,1fr)] gap-3 rounded-lg border bg-card/65 p-3 text-left text-card-foreground shadow-[0_14px_45px_rgba(2,6,23,0.24)] backdrop-blur-xl transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 hover:shadow-[0_18px_55px_rgba(2,6,23,0.3),0_0_30px_rgba(56,189,248,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        'group grid w-full grid-cols-[72px_minmax(0,1fr)] gap-3 rounded-lg border bg-card/65 p-3 text-left text-card-foreground shadow-[0_14px_45px_rgba(2,6,23,0.24)] backdrop-blur-xl transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 hover:shadow-[0_18px_55px_rgba(2,6,23,0.3),0_0_30px_rgba(56,189,248,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none',
         isSelected
           ? 'border-primary/70 bg-primary/15 shadow-[0_18px_58px_rgba(2,6,23,0.32),0_0_34px_rgba(56,189,248,0.18)]'
           : 'border-border/70',
@@ -668,11 +674,15 @@ function PostEditor({
 }) {
   if (isLoading) {
     return (
-      <Card className="border-primary/15 bg-card/65">
+      <Card className="overflow-hidden border-primary/15 bg-card/65" aria-busy="true">
         <CardHeader>
           <CardTitle>Loading post</CardTitle>
           <CardDescription>Opening the selected draft.</CardDescription>
         </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="h-2 rounded-full bg-primary/15 motion-safe:animate-pulse" />
+          <div className="h-2 w-3/4 rounded-full bg-violet-300/15 motion-safe:animate-pulse" />
+        </CardContent>
       </Card>
     );
   }
@@ -981,6 +991,7 @@ function PostEditor({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Input
               type="file"
+              className="cursor-pointer border-dashed border-primary/25 bg-primary/5 hover:border-primary/45 hover:bg-primary/10"
               accept="image/jpeg,image/png,image/webp"
               multiple
               disabled={isUploading}

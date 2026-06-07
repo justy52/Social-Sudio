@@ -149,9 +149,12 @@ export function ImageEditor({
   }
 
   return (
-    <section className="relative space-y-4 overflow-hidden rounded-md border border-primary/15 bg-card/55 p-4 shadow-[0_18px_48px_rgba(2,6,23,0.28),0_0_30px_rgba(56,189,248,0.08)] backdrop-blur-xl">
+    <section
+      className="relative space-y-4 overflow-hidden rounded-md border border-primary/15 bg-card/55 p-4 shadow-[0_18px_48px_rgba(2,6,23,0.28),0_0_30px_rgba(56,189,248,0.08)] backdrop-blur-xl"
+      aria-busy={isSaving}
+    >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/25 bg-primary/10 shadow-[0_0_22px_rgba(56,189,248,0.14)]">
             <ImagePlus className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -166,6 +169,8 @@ export function ImageEditor({
 
       {(message || error) && (
         <div
+          role={error ? 'alert' : 'status'}
+          aria-live="polite"
           className={
             error
               ? 'rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-[0_0_24px_rgba(239,68,68,0.08)]'
