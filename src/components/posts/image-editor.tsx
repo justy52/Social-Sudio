@@ -136,9 +136,11 @@ export function ImageEditor({
 
   if (!backgroundMedia) {
     return (
-      <section className="space-y-3 rounded-md border border-dashed border-border p-4">
+      <section className="space-y-3 rounded-md border border-dashed border-primary/25 bg-secondary/30 p-4">
         <div className="flex items-center gap-2">
-          <ImagePlus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10">
+            <ImagePlus className="h-4 w-4 text-primary" aria-hidden="true" />
+          </span>
           <h3 className="text-sm font-semibold">Image editor</h3>
         </div>
         <p className="text-sm text-muted-foreground">Upload an image to open the editor.</p>
@@ -147,9 +149,15 @@ export function ImageEditor({
   }
 
   return (
-    <section className="space-y-4 rounded-md border border-border bg-muted/30 p-4">
+    <section className="relative space-y-4 overflow-hidden rounded-md border border-primary/15 bg-card/55 p-4 shadow-[0_18px_48px_rgba(2,6,23,0.28),0_0_30px_rgba(56,189,248,0.08)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">Image editor</h3>
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/25 bg-primary/10 shadow-[0_0_22px_rgba(56,189,248,0.14)]">
+            <ImagePlus className="h-4 w-4 text-primary" aria-hidden="true" />
+          </span>
+          <h3 className="text-sm font-semibold">Image editor</h3>
+        </div>
         <Button type="button" onClick={handleSaveEditedImage} disabled={isSaving}>
           <Save className="h-4 w-4" aria-hidden="true" />
           {isSaving ? 'Saving' : 'Save edited image'}
@@ -160,15 +168,15 @@ export function ImageEditor({
         <div
           className={
             error
-              ? 'rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive'
-              : 'rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-primary'
+              ? 'rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-[0_0_24px_rgba(239,68,68,0.08)]'
+              : 'rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-primary shadow-[0_0_24px_rgba(56,189,248,0.08)]'
           }
         >
           {error ?? message}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-md border border-border bg-background">
+      <div className="overflow-hidden rounded-md border border-primary/15 bg-background shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_16px_45px_rgba(2,6,23,0.3)]">
         <canvas ref={canvasRef} className="block h-auto w-full" aria-label="Image editor preview" />
       </div>
 
@@ -274,7 +282,7 @@ export function ImageEditor({
               onChange={(event) =>
                 setSettings((current) => ({ ...current, isBold: event.target.checked }))
               }
-              className="h-4 w-4 rounded border-input accent-primary"
+              className="h-4 w-4 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
             />
             Bold
           </label>
@@ -288,7 +296,7 @@ export function ImageEditor({
                   hasTextHighlight: event.target.checked,
                 }))
               }
-              className="h-4 w-4 rounded border-input accent-primary"
+              className="h-4 w-4 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
             />
             Highlight
           </label>
@@ -296,7 +304,7 @@ export function ImageEditor({
       </div>
 
       {settings.logoUrl && (
-        <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
+        <div className="grid gap-4 border-t border-border/60 pt-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="logo-position">Logo position</Label>
             <Select

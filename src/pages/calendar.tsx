@@ -1,7 +1,17 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, CheckCircle2, Copy, ExternalLink, ImagePlus, RefreshCw } from 'lucide-react';
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Download,
+  ExternalLink,
+  ImagePlus,
+  Radio,
+  RefreshCw,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,11 +31,7 @@ import {
   getTodayQueueSections,
   groupCalendarQueuePosts,
 } from '@/lib/posts/calendar-queue';
-import {
-  getPost,
-  listPosts,
-  updatePost,
-} from '@/lib/posts/client';
+import { getPost, listPosts, updatePost } from '@/lib/posts/client';
 import {
   applyQuickExportStatusTransitions,
   buildFullPostText,
@@ -52,6 +58,14 @@ const statusLabels: Record<PostStatus, string> = {
   exported: 'Exported',
 };
 
+const statusStyles: Record<PostStatus, string> = {
+  draft: 'border-slate-400/25 bg-slate-400/10 text-slate-200',
+  ready_for_review: 'border-amber-300/30 bg-amber-400/10 text-amber-200',
+  approved: 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200',
+  scheduled: 'border-cyan-300/30 bg-cyan-400/10 text-cyan-200',
+  exported: 'border-primary/35 bg-primary/15 text-primary',
+};
+
 export function CalendarPage() {
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
@@ -75,10 +89,7 @@ export function CalendarPage() {
     [activeBusiness?.timezone, filteredPosts],
   );
   const todaySections = useMemo(() => getTodayQueueSections(posts), [posts]);
-  const todayCount = useMemo(
-    () => filterCalendarQueuePosts(posts, 'today').length,
-    [posts],
-  );
+  const todayCount = useMemo(() => filterCalendarQueuePosts(posts, 'today').length, [posts]);
 
   const exportMutation = useMutation({
     mutationFn: async (post: CalendarQueuePost) => {
@@ -107,7 +118,8 @@ export function CalendarPage() {
   });
 
   const unscheduleMutation = useMutation({
-    mutationFn: (post: CalendarQueuePost) => updatePost(getToken, post.id, buildUnschedulePayload()),
+    mutationFn: (post: CalendarQueuePost) =>
+      updatePost(getToken, post.id, buildUnschedulePayload()),
     onSuccess: async () => {
       setMessage('Post unscheduled.');
       setError(null);
@@ -151,22 +163,30 @@ export function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-normal">Calendar</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manual posting queue for {activeBusiness?.name ?? 'your business'}.
-          </p>
+      <header className="relative overflow-hidden rounded-lg border border-primary/15 bg-card/60 p-5 shadow-[0_22px_70px_rgba(2,6,23,0.36)] backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(56,189,248,0.15),transparent_34%),radial-gradient(circle_at_88%_16%,rgba(139,92,246,0.16),transparent_34%)]" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-md border border-primary/30 bg-primary/10 shadow-[0_0_30px_rgba(56,189,248,0.2)]">
+              <Radio className="h-5 w-5 text-primary" aria-hidden="true" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-normal">Calendar</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Manual posting queue for {activeBusiness?.name ?? 'your business'}.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void postsQuery.refetch()}
+            disabled={postsQuery.isFetching}
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Refresh
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => void postsQuery.refetch()}
-          disabled={postsQuery.isFetching}
-        >
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          Refresh
-        </Button>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -179,7 +199,7 @@ export function CalendarPage() {
       {(message || error) && (
         <div
           className={cn(
-            'rounded-md border px-4 py-3 text-sm',
+            'rounded-md border px-4 py-3 text-sm shadow-[0_0_28px_rgba(56,189,248,0.08)] backdrop-blur-xl',
             error
               ? 'border-destructive/30 bg-destructive/10 text-destructive'
               : 'border-primary/20 bg-primary/10 text-primary',
@@ -189,7 +209,7 @@ export function CalendarPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 rounded-md border border-border/60 bg-card/45 p-2 shadow-[0_12px_38px_rgba(2,6,23,0.2)] backdrop-blur-xl">
         {(Object.keys(filterLabels) as CalendarQueueFilter[]).map((filter) => (
           <Button
             key={filter}
@@ -204,7 +224,7 @@ export function CalendarPage() {
       </div>
 
       {postsQuery.isLoading ? (
-        <Card>
+        <Card className="border-primary/15 bg-card/65">
           <CardHeader>
             <CardTitle>Loading queue</CardTitle>
             <CardDescription>Fetching scheduled posts for the selected business.</CardDescription>
@@ -230,9 +250,11 @@ export function CalendarPage() {
         <section className="space-y-5">
           {groups.map((group) => (
             <div key={group.dateKey} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
-                <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
+              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-card/45 px-3 py-2 shadow-[0_12px_38px_rgba(2,6,23,0.2)] backdrop-blur-xl">
+                <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/25 bg-primary/10 shadow-[0_0_22px_rgba(56,189,248,0.12)]">
+                  <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
+                </span>
+                <h2 className="text-sm font-semibold uppercase tracking-normal text-foreground">
                   {group.label}
                 </h2>
               </div>
@@ -302,7 +324,9 @@ function TodayQueueView({
         title="To Post Today"
         count={sections.remainingCount}
         posts={sections.remaining}
-        emptyState={sections.emptyState === 'all-posted' ? <TodayEmptyState kind="all-posted" /> : null}
+        emptyState={
+          sections.emptyState === 'all-posted' ? <TodayEmptyState kind="all-posted" /> : null
+        }
         timeZone={timeZone}
         isExporting={isExporting}
         isUnscheduling={isUnscheduling}
@@ -370,10 +394,12 @@ function TodayQueueSection({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
-          <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-card/45 px-3 py-2 shadow-[0_12px_38px_rgba(2,6,23,0.2)] backdrop-blur-xl">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 shadow-[0_0_22px_rgba(56,189,248,0.12)]">
+            <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
+          </span>
+          <h2 className="truncate text-sm font-semibold uppercase tracking-normal text-foreground">
             {title}
           </h2>
         </div>
@@ -410,14 +436,21 @@ function TodayEmptyState({ kind }: { kind: 'no-posts' | 'all-posted' }) {
   const isComplete = kind === 'all-posted';
 
   return (
-    <Card className={cn(isComplete && 'border-primary/20 bg-primary/5')}>
+    <Card
+      className={cn(
+        'border-dashed border-primary/25 bg-card/55',
+        isComplete && 'border-emerald-300/25 bg-emerald-400/10',
+      )}
+    >
       <CardHeader>
         {isComplete ? (
           <CheckCircle2 className="h-5 w-5 text-primary" aria-hidden="true" />
         ) : (
           <CalendarDays className="h-5 w-5 text-primary" aria-hidden="true" />
         )}
-        <CardTitle>{isComplete ? 'All scheduled posts are posted' : 'No posts scheduled today'}</CardTitle>
+        <CardTitle>
+          {isComplete ? 'All scheduled posts are posted' : 'No posts scheduled today'}
+        </CardTitle>
         <CardDescription>
           {isComplete
             ? 'Everything scheduled for today has been marked posted.'
@@ -437,9 +470,17 @@ function TodayEmptyState({ kind }: { kind: 'no-posts' | 'all-posted' }) {
 
 function QueueStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-border bg-muted/30 px-4 py-3">
-      <p className="text-2xl font-semibold">{value}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+    <div className="group relative overflow-hidden rounded-lg border border-primary/15 bg-card/65 px-4 py-3 shadow-[0_18px_52px_rgba(2,6,23,0.26)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent opacity-70" />
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-2xl font-semibold">{value}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+        </div>
+        <span className="rounded-md border border-primary/20 bg-primary/10 p-2 text-primary shadow-[0_0_22px_rgba(56,189,248,0.12)]">
+          <Clock className="h-4 w-4" aria-hidden="true" />
+        </span>
+      </div>
     </div>
   );
 }
@@ -476,11 +517,17 @@ function QueuePostCard({
   const isPosted = completionState === 'complete';
 
   return (
-    <Card className={cn(isPosted && 'border-primary/20 border-l-4 border-l-primary/60 bg-muted/50 shadow-none')}>
+    <Card
+      className={cn(
+        'overflow-hidden border-primary/15 bg-card/70',
+        isPosted &&
+          'border-emerald-300/25 border-l-4 border-l-emerald-300/60 bg-emerald-400/10 shadow-[0_16px_45px_rgba(2,6,23,0.22)]',
+      )}
+    >
       <CardContent className="grid gap-4 p-4 sm:grid-cols-[96px_minmax(0,1fr)]">
         <div
           className={cn(
-            'flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border bg-muted',
+            'flex aspect-square items-center justify-center overflow-hidden rounded-md border border-primary/15 bg-secondary/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
             isPosted && 'opacity-75 grayscale',
           )}
         >
@@ -492,7 +539,7 @@ function QueuePostCard({
         </div>
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge>{statusLabels[post.status]}</Badge>
+            <Badge className={statusStyles[post.status]}>{statusLabels[post.status]}</Badge>
             <span className="text-sm text-muted-foreground">
               {post.status === 'exported'
                 ? post.exportedAt
@@ -504,7 +551,7 @@ function QueuePostCard({
             </span>
             <span className="text-xs text-muted-foreground">{post.platformSize}</span>
             {isPosted && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2 py-1 text-xs font-medium text-emerald-200">
                 <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                 Posted manually
               </span>
@@ -518,7 +565,12 @@ function QueuePostCard({
           )}
 
           <div>
-            <p className={cn('line-clamp-2 text-sm font-medium', isPosted && 'text-muted-foreground')}>
+            <p
+              className={cn(
+                'line-clamp-2 text-sm font-medium',
+                isPosted && 'text-muted-foreground',
+              )}
+            >
               {post.caption || 'No caption yet'}
             </p>
             {hashtags && (
@@ -541,7 +593,7 @@ function QueuePostCard({
               disabled={isExporting || !canExport}
               title={canExport ? undefined : 'Add an image and caption before exporting.'}
             >
-              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              <Download className="h-4 w-4" aria-hidden="true" />
               {post.status === 'exported' ? 'Re-export' : 'Export'}
             </Button>
             {post.status === 'scheduled' && (
@@ -598,7 +650,7 @@ function CalendarEmptyState({ filter }: { filter: CalendarQueueFilter }) {
   const label = filter === 'exported' ? 'exported posts' : `${filter} scheduled posts`;
 
   return (
-    <Card>
+    <Card className="border-dashed border-primary/25 bg-card/55">
       <CardHeader>
         <CalendarDays className="h-5 w-5 text-primary" aria-hidden="true" />
         <CardTitle>No {label} yet</CardTitle>

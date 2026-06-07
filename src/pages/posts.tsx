@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Download, ImagePlus, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
+import {
+  Bot,
+  CalendarClock,
+  CheckCircle2,
+  Copy,
+  Download,
+  ImagePlus,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { CaptionGenerator } from '@/components/posts/caption-generator';
 import { ImageEditor } from '@/components/posts/image-editor';
@@ -64,6 +76,14 @@ const statusLabels: Record<PostStatus, string> = {
   approved: 'Approved',
   scheduled: 'Scheduled',
   exported: 'Exported',
+};
+
+const statusStyles: Record<PostStatus, string> = {
+  draft: 'border-slate-400/25 bg-slate-400/10 text-slate-200',
+  ready_for_review: 'border-amber-300/30 bg-amber-400/10 text-amber-200',
+  approved: 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200',
+  scheduled: 'border-cyan-300/30 bg-cyan-400/10 text-cyan-200',
+  exported: 'border-primary/35 bg-primary/15 text-primary',
 };
 
 const emptyForm: PostFormState = {
@@ -381,34 +401,43 @@ export function PostsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-normal">Posts</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Draft posts and image uploads for {activeBusiness?.name ?? 'your business'}.
-          </p>
+      <header className="relative overflow-hidden rounded-lg border border-primary/15 bg-card/60 p-5 shadow-[0_22px_70px_rgba(2,6,23,0.36)] backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0%,rgba(139,92,246,0.18),transparent_34%),radial-gradient(circle_at_86%_18%,rgba(34,211,238,0.13),transparent_36%)]" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-md border border-primary/30 bg-primary/10 shadow-[0_0_30px_rgba(56,189,248,0.2)]">
+              <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-normal">Posts</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Draft posts and image uploads for {activeBusiness?.name ?? 'your business'}.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            onClick={() => createMutation.mutate()}
+            disabled={!activeBusiness || createMutation.isPending}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {createMutation.isPending ? 'Creating' : 'Create Draft'}
+          </Button>
         </div>
-        <Button
-          type="button"
-          onClick={() => createMutation.mutate()}
-          disabled={!activeBusiness || createMutation.isPending}
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {createMutation.isPending ? 'Creating' : 'Create Draft'}
-        </Button>
       </header>
 
-      <section className="rounded-md border border-border bg-muted/30 px-4 py-3">
+      <section className="rounded-md border border-border/60 bg-card/45 px-4 py-3 shadow-[0_12px_38px_rgba(2,6,23,0.2)] backdrop-blur-xl">
         <p className="text-sm font-medium text-foreground">{activeBusiness?.name}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {activeBusiness?.industry ?? 'No industry set'} · {activeBusiness?.brandVoice ?? 'No brand voice set'}
+          {activeBusiness?.industry ?? 'No industry set'} /{' '}
+          {activeBusiness?.brandVoice ?? 'No brand voice set'}
         </p>
       </section>
 
       {(message || error) && (
         <div
           className={cn(
-            'rounded-md border px-4 py-3 text-sm',
+            'rounded-md border px-4 py-3 text-sm shadow-[0_0_28px_rgba(56,189,248,0.08)] backdrop-blur-xl',
             error
               ? 'border-destructive/30 bg-destructive/10 text-destructive'
               : 'border-primary/20 bg-primary/10 text-primary',
@@ -420,10 +449,15 @@ export function PostsPage() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
-              Draft workspace
-            </h2>
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-card/45 px-3 py-2 shadow-[0_12px_38px_rgba(2,6,23,0.2)] backdrop-blur-xl">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 shadow-[0_0_22px_rgba(56,189,248,0.12)]">
+                <Pencil className="h-4 w-4 text-primary" aria-hidden="true" />
+              </span>
+              <h2 className="truncate text-sm font-semibold uppercase tracking-normal text-foreground">
+                Draft workspace
+              </h2>
+            </div>
             <Button
               type="button"
               variant="ghost"
@@ -437,18 +471,20 @@ export function PostsPage() {
           </div>
 
           {postsQuery.isLoading ? (
-            <Card>
+            <Card className="border-primary/15 bg-card/65">
               <CardHeader>
                 <CardTitle>Loading posts</CardTitle>
                 <CardDescription>Fetching drafts for the selected business.</CardDescription>
               </CardHeader>
             </Card>
           ) : posts.length === 0 ? (
-            <Card>
+            <Card className="border-dashed border-primary/25 bg-card/55">
               <CardHeader>
                 <ImagePlus className="h-5 w-5 text-primary" aria-hidden="true" />
                 <CardTitle>No posts yet</CardTitle>
-                <CardDescription>Create a draft to start testing the image workflow.</CardDescription>
+                <CardDescription>
+                  Create a draft to start testing the image workflow.
+                </CardDescription>
               </CardHeader>
             </Card>
           ) : (
@@ -542,11 +578,13 @@ function PostListCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'grid w-full grid-cols-[72px_minmax(0,1fr)] gap-3 rounded-lg border bg-card p-3 text-left text-card-foreground transition-colors hover:border-primary/50',
-        isSelected ? 'border-primary shadow-sm' : 'border-border',
+        'group grid w-full grid-cols-[72px_minmax(0,1fr)] gap-3 rounded-lg border bg-card/65 p-3 text-left text-card-foreground shadow-[0_14px_45px_rgba(2,6,23,0.24)] backdrop-blur-xl transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 hover:shadow-[0_18px_55px_rgba(2,6,23,0.3),0_0_30px_rgba(56,189,248,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        isSelected
+          ? 'border-primary/70 bg-primary/15 shadow-[0_18px_58px_rgba(2,6,23,0.32),0_0_34px_rgba(56,189,248,0.18)]'
+          : 'border-border/70',
       )}
     >
-      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md border border-primary/15 bg-secondary/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         {previewUrl ? (
           <img src={previewUrl} alt="" className="h-full w-full object-cover" />
         ) : (
@@ -555,14 +593,12 @@ function PostListCard({
       </div>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge>{statusLabels[post.status]}</Badge>
+          <Badge className={statusStyles[post.status]}>{statusLabels[post.status]}</Badge>
           <span className="text-xs text-muted-foreground">{post.platformSize}</span>
         </div>
-        <p className="mt-2 line-clamp-2 text-sm font-medium">
-          {post.caption || 'Untitled draft'}
-        </p>
+        <p className="mt-2 line-clamp-2 text-sm font-medium">{post.caption || 'Untitled draft'}</p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Updated {formatDate(post.updatedAt)} · Created {formatDate(post.createdAt)}
+          Updated {formatDate(post.updatedAt)} / Created {formatDate(post.createdAt)}
         </p>
       </div>
     </button>
@@ -632,7 +668,7 @@ function PostEditor({
 }) {
   if (isLoading) {
     return (
-      <Card>
+      <Card className="border-primary/15 bg-card/65">
         <CardHeader>
           <CardTitle>Loading post</CardTitle>
           <CardDescription>Opening the selected draft.</CardDescription>
@@ -643,7 +679,7 @@ function PostEditor({
 
   if (!detail) {
     return (
-      <Card>
+      <Card className="border-dashed border-primary/25 bg-card/55">
         <CardHeader>
           <Pencil className="h-5 w-5 text-primary" aria-hidden="true" />
           <CardTitle>Select or create a draft</CardTitle>
@@ -669,14 +705,20 @@ function PostEditor({
   );
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="overflow-hidden border-primary/15 bg-card/70">
+      <CardHeader className="relative overflow-hidden border-b border-border/60 bg-secondary/25">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(56,189,248,0.13),transparent_32%),linear-gradient(90deg,rgba(56,189,248,0.08),transparent_38%)]" />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Edit draft</CardTitle>
-            <CardDescription>
-              Save copy, upload images, and move through the lean Phase 2 review states.
-            </CardDescription>
+          <div className="relative flex items-start gap-3">
+            <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 shadow-[0_0_22px_rgba(56,189,248,0.14)]">
+              <Pencil className="h-4 w-4 text-primary" aria-hidden="true" />
+            </span>
+            <div>
+              <CardTitle>Edit draft</CardTitle>
+              <CardDescription>
+                Save copy, upload images, and move through the lean Phase 2 review states.
+              </CardDescription>
+            </div>
           </div>
           {detail.post.status === 'draft' && (
             <Button
@@ -692,7 +734,7 @@ function PostEditor({
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-5 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="post-status">Status</Label>
@@ -831,12 +873,15 @@ function PostEditor({
         )}
 
         {detail.post.status === 'approved' && (
-          <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4">
-            <div>
-              <h3 className="text-sm font-semibold">Schedule for Later</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Times are shown in {businessTimezone ?? 'the business timezone'}.
-              </p>
+          <div className="space-y-3 rounded-md border border-cyan-300/20 bg-cyan-400/10 p-4 shadow-[0_0_30px_rgba(34,211,238,0.08)]">
+            <div className="flex items-start gap-2">
+              <CalendarClock className="mt-0.5 h-4 w-4 text-primary" aria-hidden="true" />
+              <div>
+                <h3 className="text-sm font-semibold">Schedule for Later</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Times are shown in {businessTimezone ?? 'the business timezone'}.
+                </p>
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_auto] sm:items-end">
               <div className="space-y-2">
@@ -870,14 +915,17 @@ function PostEditor({
         )}
 
         {detail.post.status === 'scheduled' && (
-          <div className="space-y-3 rounded-md border border-primary/20 bg-primary/10 p-4">
-            <div>
-              <h3 className="text-sm font-semibold text-primary">Scheduled post</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {detail.post.scheduledAt
-                  ? `Scheduled for ${formatDateTime(detail.post.scheduledAt, businessTimezone)}`
-                  : 'Scheduled time unavailable'}
-              </p>
+          <div className="space-y-3 rounded-md border border-primary/25 bg-primary/10 p-4 shadow-[0_0_30px_rgba(56,189,248,0.1)]">
+            <div className="flex items-start gap-2">
+              <CalendarClock className="mt-0.5 h-4 w-4 text-primary" aria-hidden="true" />
+              <div>
+                <h3 className="text-sm font-semibold text-primary">Scheduled post</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {detail.post.scheduledAt
+                    ? `Scheduled for ${formatDateTime(detail.post.scheduledAt, businessTimezone)}`
+                    : 'Scheduled time unavailable'}
+                </p>
+              </div>
             </div>
             <Button
               type="button"
@@ -891,17 +939,20 @@ function PostEditor({
         )}
 
         {detail.post.status === 'exported' && (
-          <div className="space-y-3 rounded-md border border-primary/20 bg-primary/10 p-4">
-            <div>
-              <h3 className="text-sm font-semibold text-primary">Exported post</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {detail.post.exportedAt
-                  ? `Exported ${formatDateTime(detail.post.exportedAt)}`
-                  : 'Exported timestamp unavailable'}
-              </p>
+          <div className="space-y-3 rounded-md border border-primary/25 bg-primary/10 p-4 shadow-[0_0_30px_rgba(56,189,248,0.1)]">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" aria-hidden="true" />
+              <div>
+                <h3 className="text-sm font-semibold text-primary">Exported post</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {detail.post.exportedAt
+                    ? `Exported ${formatDateTime(detail.post.exportedAt)}`
+                    : 'Exported timestamp unavailable'}
+                </p>
+              </div>
             </div>
             {exportMedia && (
-              <div className="overflow-hidden rounded-md border border-border bg-muted">
+              <div className="overflow-hidden rounded-md border border-primary/15 bg-secondary/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <img src={exportMedia.blobUrl} alt="" className="max-h-80 w-full object-contain" />
               </div>
             )}
@@ -915,15 +966,16 @@ function PostEditor({
         )}
 
         {!isExportable && (
-          <p className="text-sm text-muted-foreground">
-            This post cannot be exported yet.
-          </p>
+          <p className="text-sm text-muted-foreground">This post cannot be exported yet.</p>
         )}
 
-        <div className="space-y-3 border-t border-border pt-5">
-          <div>
-            <h3 className="text-sm font-semibold">Images</h3>
-            <p className="mt-1 text-sm text-muted-foreground">JPEG, PNG, or WebP. Maximum 4MB.</p>
+        <div className="space-y-3 border-t border-border/60 pt-5">
+          <div className="flex items-start gap-2">
+            <Upload className="mt-0.5 h-4 w-4 text-primary" aria-hidden="true" />
+            <div>
+              <h3 className="text-sm font-semibold">Images</h3>
+              <p className="mt-1 text-sm text-muted-foreground">JPEG, PNG, or WebP. Maximum 4MB.</p>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -956,22 +1008,23 @@ function PostEditor({
           />
 
           {detail.media.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+            <div className="rounded-md border border-dashed border-primary/25 bg-secondary/35 p-4 text-sm text-muted-foreground">
               No images uploaded yet.
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {detail.media.map((media) => (
-                <div key={media.id} className="rounded-md border border-border bg-muted/30 p-2">
-                  <div className="aspect-square overflow-hidden rounded-md bg-muted">
+                <div
+                  key={media.id}
+                  className="rounded-md border border-border/70 bg-card/45 p-2 shadow-[0_12px_36px_rgba(2,6,23,0.22)]"
+                >
+                  <div className="aspect-square overflow-hidden rounded-md bg-secondary/55">
                     <img src={media.blobUrl} alt="" className="h-full w-full object-cover" />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-xs text-muted-foreground">{media.mimeType}</p>
-                      {media.isEdited && (
-                        <p className="text-xs font-medium text-primary">Edited</p>
-                      )}
+                      {media.isEdited && <p className="text-xs font-medium text-primary">Edited</p>}
                     </div>
                     <Button
                       type="button"

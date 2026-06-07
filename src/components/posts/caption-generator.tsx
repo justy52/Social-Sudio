@@ -27,11 +27,7 @@ type CaptionGeneratorProps = {
   onUseCaption: (selection: CaptionGeneratorSelection) => void;
 };
 
-export function CaptionGenerator({
-  businessId,
-  getToken,
-  onUseCaption,
-}: CaptionGeneratorProps) {
+export function CaptionGenerator({ businessId, getToken, onUseCaption }: CaptionGeneratorProps) {
   const [promptContext, setPromptContext] = useState('');
   const [tone, setTone] = useState<CaptionTone>('professional');
   const [includeHashtags, setIncludeHashtags] = useState(true);
@@ -77,10 +73,18 @@ export function CaptionGenerator({
   }
 
   return (
-    <section className="space-y-4 rounded-md border border-border bg-muted/30 p-4">
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-        <h3 className="text-sm font-semibold">Caption generator</h3>
+    <section className="relative space-y-4 overflow-hidden rounded-md border border-violet-300/20 bg-card/55 p-4 shadow-[0_18px_48px_rgba(2,6,23,0.28),0_0_30px_rgba(139,92,246,0.08)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/60 to-transparent" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md border border-violet-300/25 bg-violet-400/10 shadow-[0_0_22px_rgba(139,92,246,0.14)]">
+            <Sparkles className="h-4 w-4 text-violet-200" aria-hidden="true" />
+          </span>
+          <h3 className="text-sm font-semibold">Caption generator</h3>
+        </div>
+        <span className="rounded-full border border-violet-300/20 bg-violet-400/10 px-2.5 py-1 text-xs text-violet-100">
+          AI module
+        </span>
       </div>
 
       <div className="space-y-2">
@@ -110,12 +114,12 @@ export function CaptionGenerator({
           </Select>
         </div>
 
-        <label className="flex min-h-10 items-center gap-2 pt-6 text-sm font-medium">
+        <label className="flex min-h-10 items-center gap-2 pt-6 text-sm font-medium text-foreground">
           <input
             type="checkbox"
             checked={includeHashtags}
             onChange={(event) => setIncludeHashtags(event.target.checked)}
-            className="h-4 w-4 rounded border-input accent-primary"
+            className="h-4 w-4 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
           />
           Include hashtags
         </label>
@@ -132,7 +136,7 @@ export function CaptionGenerator({
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-[0_0_24px_rgba(239,68,68,0.08)]">
           {error}
         </div>
       )}
@@ -143,7 +147,7 @@ export function CaptionGenerator({
       </Button>
 
       {generated && (
-        <div className="space-y-4 border-t border-border pt-4">
+        <div className="space-y-4 rounded-md border border-border/60 bg-secondary/35 p-4">
           <div className="space-y-2">
             <Label htmlFor="generated-caption">Generated caption</Label>
             <Textarea
@@ -163,8 +167,10 @@ export function CaptionGenerator({
                     type="button"
                     onClick={() => setSelectedCaption(alternative)}
                     className={cn(
-                      'rounded-md border bg-background p-3 text-left text-sm transition-colors hover:border-primary/50',
-                      selectedCaption === alternative ? 'border-primary' : 'border-border',
+                      'rounded-md border bg-card/55 p-3 text-left text-sm text-card-foreground shadow-[0_10px_28px_rgba(2,6,23,0.18)] transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                      selectedCaption === alternative
+                        ? 'border-primary/70 bg-primary/15 shadow-[0_0_28px_rgba(56,189,248,0.12)]'
+                        : 'border-border/70',
                     )}
                   >
                     {alternative}
@@ -179,7 +185,7 @@ export function CaptionGenerator({
               {generated.hashtags.map((hashtag) => (
                 <span
                   key={hashtag}
-                  className="rounded-md bg-background px-2 py-1 text-xs text-muted-foreground"
+                  className="rounded-md border border-primary/15 bg-primary/10 px-2 py-1 text-xs text-primary"
                 >
                   {hashtag}
                 </span>

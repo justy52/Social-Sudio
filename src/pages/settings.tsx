@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Building2, Palette, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -56,21 +56,37 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-normal">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage the basic business brand settings used by future content workflows.
-        </p>
-      </div>
+      <header className="relative overflow-hidden rounded-lg border border-primary/15 bg-card/60 p-5 shadow-[0_22px_70px_rgba(2,6,23,0.36)] backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(56,189,248,0.14),transparent_34%),radial-gradient(circle_at_88%_18%,rgba(139,92,246,0.16),transparent_34%)]" />
+        <div className="relative flex items-start gap-3">
+          <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-md border border-primary/30 bg-primary/10 shadow-[0_0_30px_rgba(56,189,248,0.2)]">
+            <Building2 className="h-5 w-5 text-primary" aria-hidden="true" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-normal">Settings</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage the basic business brand settings used by future content workflows.
+            </p>
+          </div>
+        </div>
+      </header>
 
-      <Card className="max-w-3xl">
-        <CardHeader>
-          <CardTitle>Business profile</CardTitle>
-          <CardDescription>
-            This is light business branding for your own workspace, not full white-label SaaS.
-          </CardDescription>
+      <Card className="max-w-3xl overflow-hidden border-primary/15 bg-card/70">
+        <CardHeader className="relative overflow-hidden border-b border-border/60 bg-secondary/25">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0%,rgba(139,92,246,0.13),transparent_32%),linear-gradient(90deg,rgba(56,189,248,0.08),transparent_38%)]" />
+          <div className="relative flex items-start gap-3">
+            <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 shadow-[0_0_22px_rgba(56,189,248,0.14)]">
+              <Palette className="h-4 w-4 text-primary" aria-hidden="true" />
+            </span>
+            <div>
+              <CardTitle>Business profile</CardTitle>
+              <CardDescription>
+                This is light business branding for your own workspace, not full white-label SaaS.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
@@ -142,7 +158,11 @@ export function SettingsPage() {
               </div>
             </div>
 
-            {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
+            {status ? (
+              <p className="rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-primary">
+                {status}
+              </p>
+            ) : null}
 
             <Button type="submit" disabled={isSaving}>
               <Save className="h-4 w-4" aria-hidden="true" />
