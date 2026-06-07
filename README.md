@@ -37,6 +37,7 @@ Phase 3 manual posting workflow is validated in Vercel Preview. Social Studio no
 - Undo posted on exported unscheduled items clears `manualPostedAt` while keeping status `exported`.
 - Posted cards use a subtle completed style with a check badge and visible posted timestamp.
 - The manual posting checklist and Undo posted regression fix are validated in browser retest.
+- `/dashboard` uses real post data for pipeline metrics, recent activity, and upcoming scheduled posts.
 - Direct publishing, cron/email reminders, analytics, billing, teams, ads, video, and templates are still out of scope/not built.
 
 See [`PHASE1_VALIDATION.md`](PHASE1_VALIDATION.md) and [`PHASE2_SCHEMA_PLAN.md`](PHASE2_SCHEMA_PLAN.md).
