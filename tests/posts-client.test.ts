@@ -33,6 +33,7 @@ import {
   isQueuePostManuallyPosted,
   type CalendarQueueFilter,
 } from '../src/lib/posts/calendar-queue.ts';
+import { buildDashboardSummary } from '../src/lib/posts/dashboard.ts';
 import {
   buildEditedImageFileName,
   buildEditedImageUploadFormData,
@@ -1007,6 +1008,116 @@ test('calendar queue exposes completed styling classification for posted cards',
 
   assert.equal(getQueuePostCompletionState(posted), 'complete');
   assert.equal(getQueuePostCompletionState({ ...posted, manualPostedAt: null }), 'open');
+});
+
+test('dashboard summary counts Phase 3 status metrics', () => {
+  const now = new Date(2026, 5, 7, 12, 0, 0);
+  const scheduledThisWeek = new Date(now);
+  scheduledThisWeek.setDate(now.getDate() + 2);
+  const scheduledNextWeek = new Date(now);
+  scheduledNextWeek.setDate(now.getDate() + 8);
+
+  const summary = buildDashboardSummary(
+    [
+      buildQueuePost({ id: 'draft_1', status: 'draft', scheduledAt: null }),
+      buildQueuePost({ id: 'draft_2', status: 'draft', scheduledAt: null }),
+      buildQueuePost({ id: 'review', status: 'ready_for_review', scheduledAt: null }),
+      buildQueuePost({ id: 'approved', status: 'approved', scheduledAt: null }),
+      buildQueuePost({
+        id: 'scheduled_this_week',
+        status: 'scheduled',
+        scheduledAt: scheduledThisWeek.toISOString(),
+      }),
+      buildQueuePost({
+        id: 'scheduled_next_week',
+        status: 'scheduled',
+        scheduledAt: scheduledNextWeek.toISOString(),
+      }),
+      buildQueuePost({
+        id: 'exported',
+        status: 'exported',
+        scheduledAt: scheduledThisWeek.toISOString(),
+        exportedAt: scheduledThisWeek.toISOString(),
+      }),
+    ],
+    now,
+  );
+
+  assert.deepEqual(summary.metrics, {
+    draftsInProgress: 2,
+    postsAwaitingReview: 1,
+    approvedReadyToExport: 1,
+    scheduledThisWeek: 1,
+  });
+});
+
+test('dashboard summary counts scheduled week in the business timezone', () => {
+  const now = new Date('2026-06-07T05:30:00.000Z');
+  const scheduledInNextDenverWeek = new Date('2026-06-07T06:30:00.000Z');
+  const summary = buildDashboardSummary(
+    [
+      buildQueuePost({
+        id: 'next_denver_week',
+        status: 'scheduled',
+        scheduledAt: scheduledInNextDenverWeek.toISOString(),
+      }),
+    ],
+    now,
+    'America/Denver',
+  );
+
+  assert.equal(summary.metrics.scheduledThisWeek, 0);
+});
+
+test('dashboard summary keeps the 10 most recently updated posts', () => {
+  const now = new Date(2026, 5, 7, 12, 0, 0);
+  const posts = Array.from({ length: 12 }, (_item, index) =>
+    buildQueuePost({
+      id: `post_${index}`,
+      updatedAt: new Date(2026, 5, 1, index, 0, 0).toISOString(),
+    }),
+  );
+  const summary = buildDashboardSummary(posts, now);
+
+  assert.equal(summary.recentActivity.length, 10);
+  assert.deepEqual(
+    summary.recentActivity.map((post) => post.id),
+    ['post_11', 'post_10', 'post_9', 'post_8', 'post_7', 'post_6', 'post_5', 'post_4', 'post_3', 'post_2'],
+  );
+});
+
+test('dashboard summary returns the next five future scheduled posts', () => {
+  const now = new Date(2026, 5, 7, 12, 0, 0);
+  const hours = 60 * 60 * 1000;
+  const scheduledPost = (id: string, offsetHours: number) =>
+    buildQueuePost({
+      id,
+      status: 'scheduled',
+      scheduledAt: new Date(now.getTime() + offsetHours * hours).toISOString(),
+    });
+
+  const summary = buildDashboardSummary(
+    [
+      scheduledPost('future_6', 6),
+      scheduledPost('future_1', 1),
+      scheduledPost('past', -1),
+      buildQueuePost({
+        id: 'approved_future',
+        status: 'approved',
+        scheduledAt: new Date(now.getTime() + hours).toISOString(),
+      }),
+      scheduledPost('future_3', 3),
+      scheduledPost('future_5', 5),
+      scheduledPost('future_2', 2),
+      scheduledPost('future_4', 4),
+    ],
+    now,
+  );
+
+  assert.deepEqual(
+    summary.upcomingScheduled.map((post) => post.id),
+    ['future_1', 'future_2', 'future_3', 'future_4', 'future_5'],
+  );
 });
 
 function buildQueuePost(overrides: Partial<PostSummary> = {}): PostSummary {
